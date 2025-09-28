@@ -74,14 +74,15 @@ def generate_api_wrapper(html_content: str) -> str:
                 field_type_str = cols[2].text_content().strip()
                 py_type = map_type_hint(field_type_str)
                 
-                field_lines.append(f'"""{field_desc}"""')
                 field_lines.append(f"{python_field_name}: {py_type} | None = Field(default=None, alias='{raw_field_name}')")
+                field_lines.append(f'"""{field_desc}"""')
 
         all_fields_str = "\n".join(field_lines) if field_lines else "pass"
         indented_fields = textwrap.indent(all_fields_str, ' ' * 4)
             
         model_code = f"class {class_name}(BaseModel):\n"
         model_code += f'    """Pydantic model for {model_name_raw}"""\n'
+        model_code += "    model_config = ConfigDict(use_attribute_docstrings=True)\n\n"
         model_code += f"{indented_fields}\n\n\n"
         model_definitions += model_code
 
@@ -179,9 +180,9 @@ def generate_api_wrapper(html_content: str) -> str:
             f'    URL: https://data.ninjakiwi.com{path}',
             f'    """',
             f'    endpoint = f"{endpoint_fstring}"',
-            f'    body = await self._get_request(endpoint)'
+            f'    body = await self._get_request(endpoint)',
+            textwrap.indent(parsing_logic, '    ')
         ]
-        method_lines.extend(textwrap.indent(parsing_logic, '    ').splitlines())
         
         method_blocks.append("\n".join(method_lines))
 
@@ -190,16 +191,18 @@ def generate_api_wrapper(html_content: str) -> str:
     import json
     import asyncio
     from typing import Literal, Any, Optional
-    from pydantic import BaseModel, Field, ValidationError
+    from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
     """)
     
-    all_methods_code = textwrap.indent("\n\n".join(method_blocks), ' ' * 4)
+    all_methods_code = "\n\n".join(method_blocks)
+    indented_methods = textwrap.indent(all_methods_code, ' ' * 4)
+    
     api_class_code = f"""class NinjaKiwiAPI:
     \"\"\"
     An asynchronous Python wrapper for the Bloons TD 6 and Battles 2 Data API.
     \"\"\"
-{all_methods_code}
+{indented_methods}
 """
 
     main_block = textwrap.dedent("""
@@ -238,7 +241,7 @@ def generate_api_wrapper(html_content: str) -> str:
         asyncio.run(main())
     """)
     
-    return f"{imports_and_header}# --- Pydantic Response Models ---\n{model_definitions.strip()}\n\n{api_class_code}\n{main_block}"
+    return f"{imports_and_header}# --- Pydantic Response Models ---\n{model_definitions.strip()}\n\n# --- API Client Class ---\n{api_class_code}\n{main_block}"
 
 
 async def run_generator():
