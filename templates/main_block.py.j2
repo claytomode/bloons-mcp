@@ -1,0 +1,33 @@
+
+async def main():
+    """Example usage of the auto-generated NinjaKiwiAPI wrapper."""
+    api = NinjaKiwiAPI()
+    print("Welcome to the BTD6 API Wrapper Example!")
+    print("-" * 40)
+
+    try:
+        print("\nFetching BTD6 races...")
+        races = await api.{{ races_func_name }}()
+
+        if races and len(races) > 0:
+            latest_race = races[0]
+            print(f"Successfully fetched {len(races)} races. Latest race: '{latest_race.name}' (ID: {latest_race.id})")
+
+            if latest_race.id:
+                print(f"\nFetching leaderboard for race: {latest_race.name}...")
+                leaderboard = await api.{{ leaderboard_func_name }}(race_id=latest_race.id)
+                if leaderboard and len(leaderboard) > 0:
+                    top_player = leaderboard[0]
+                    print(f"Top player: {top_player.display_name} with score {top_player.score}")
+                else:
+                    print("Could not retrieve leaderboard or it is empty.")
+        else:
+            print("Failed to fetch BTD6 races or no races are available.")
+
+    finally:
+        print("\nClosing API client.")
+        await api.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

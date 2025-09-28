@@ -1,0 +1,27 @@
+
+async def {{ method.name }}(self{%- if method.params %}, {% for p in method.params %}{{ p }}: str{% if not loop.last %}, {% endif %}{% endfor %}{%- endif %}) -> {{ method.return_type }}:
+    """
+    {{ method.description }}
+    URL: https://data.ninjakiwi.com{{ method.url }}
+    """
+    endpoint = f"{{ method.endpoint_fstring }}"
+    body = await self._get_request(endpoint)
+{% if method.model_name == 'Any' %}
+    return body
+{% elif method.is_list %}
+    if not body or not isinstance(body, list):
+        return None
+    try:
+        return [{{ method.model_name }}.model_validate(item) for item in body]
+    except ValidationError as e:
+        print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+        return None
+{% else %}
+    if not body or not isinstance(body, dict):
+        return None
+    try:
+        return {{ method.model_name }}.model_validate(body)
+    except ValidationError as e:
+        print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+        return None
+{% endif %}

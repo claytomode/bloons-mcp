@@ -1,0 +1,10 @@
+
+class {{ model.class_name }}(BaseModel):
+    """Pydantic model for {{ model.raw_name }}"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+{% for field in model.fields %}
+    {{ field.name }}: {{ field.type_hint }} | None = Field(default=None, alias='{{ field.alias }}')
+    """{{ field.description }}"""
+
+{%- endfor %}

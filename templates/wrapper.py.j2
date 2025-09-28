@@ -1,0 +1,47 @@
+
+import asyncio
+import json
+from typing import Any
+
+import httpx
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+# --- Pydantic Response Models ---
+{{ pydantic_models }}
+
+# --- API Client Class ---
+class NinjaKiwiAPI:
+    """
+    An asynchronous Python wrapper for the Bloons TD 6 and Battles 2 Data API.
+    This wrapper was auto-generated from the API documentation.
+    """
+    def __init__(self, base_url="https://data.ninjakiwi.com"):
+        self.client = httpx.AsyncClient(base_url=base_url, follow_redirects=True)
+
+    async def _get_request(self, endpoint: str) -> Any | None:
+        """Internal method to handle GET requests."""
+        try:
+            response = await self.client.get(endpoint)
+            response.raise_for_status()
+            data = response.json()
+            if data and data.get('error'):
+                print(f"API Error for {endpoint}: {data['error']}")
+                return None
+            return data.get('body')
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP Error for endpoint '{endpoint}': {e}")
+            return None
+        except (httpx.RequestError, json.JSONDecodeError) as e:
+            print(f"An error occurred with endpoint '{endpoint}': {e}")
+            return None
+
+    async def close(self):
+        """Closes the httpx client."""
+        await self.client.aclose()
+
+{% for method in methods %}
+{{- method -}}
+{% endfor %}
+
+# --- Example Usage ---
+{{ main_block }}
