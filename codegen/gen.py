@@ -5,7 +5,7 @@ import textwrap
 import httpx
 from jinja2 import Environment, FileSystemLoader
 from lxml import html
-
+from pathlib import Path
 
 def to_snake_case(name: str) -> str:
     """Converts a string from camelCase to snake_case."""
@@ -156,11 +156,13 @@ def generate_main_block_context(methods_data: list[dict]) -> dict:
 
 async def run_generator():
     """Fetches the API docs and generates the wrapper script using templates."""
+    SCRIPT_DIR = Path(__file__).parent.resolve()
+    PROJECT_ROOT = SCRIPT_DIR.parent
     url = "https://data.ninjakiwi.com/"
-    output_filename = 'btd6_api_wrapper.py'
-    
+    output_filename = PROJECT_ROOT / 'btd6_api_wrapper.py'
+
     print("--- API Wrapper Generator Script ---")
-    
+
     print(f"1. Fetching latest API documentation from {url}...")
     try:
         async with httpx.AsyncClient() as client:
@@ -176,15 +178,16 @@ async def run_generator():
 
     print("2. Parsing HTML and generating code...")
     tree = html.fromstring(html_input)
-    
+
     rendered_models = generate_pydantic_models(tree)
-    
+
     methods_data = parse_api_methods(tree)
     main_context = generate_main_block_context(methods_data)
 
     print("3. Rendering final API wrapper from templates...")
-    env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)
-    
+    template_dir = SCRIPT_DIR / "templates"
+    env = Environment(loader=FileSystemLoader(template_dir), trim_blocks=True, lstrip_blocks=True)
+
     rendered_methods = "\n\n".join([textwrap.indent(env.get_template("api_method.py.j2").render(method=m), ' ' * 4) for m in methods_data])
     rendered_main = env.get_template("main_block.py.j2").render(**main_context)
 
@@ -193,11 +196,11 @@ async def run_generator():
         methods=rendered_methods,
         main_block=rendered_main
     )
-    
+
     print(f"4. Writing wrapper to '{output_filename}'...")
     with open(output_filename, 'w', encoding='utf-8') as f_out:
         f_out.write(final_code)
-    
+
     print(f"\nSuccessfully generated '{output_filename}'.")
 
 

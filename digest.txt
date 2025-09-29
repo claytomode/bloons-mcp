@@ -1,0 +1,2235 @@
+Directory structure:
+└── bloons-mcp/
+    ├── README.md
+    ├── btd6_api_wrapper.py
+    ├── pyproject.toml
+    ├── uv.lock
+    ├── .python-version
+    └── codegen/
+        ├── __init__.py
+        ├── gen.py
+        └── templates/
+            ├── api_method.py.j2
+            ├── main_block.py.j2
+            ├── pydantic_model.py.j2
+            └── wrapper.py.j2
+
+================================================
+FILE: README.md
+================================================
+[Empty file]
+
+
+================================================
+FILE: btd6_api_wrapper.py
+================================================
+
+import asyncio
+import json
+from typing import Any
+
+import httpx
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+# --- Pydantic Response Models ---
+class Btd6race(BaseModel):
+    """Pydantic model for _btd6race"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """Race Event ID"""
+
+    name: str | None = Field(default=None, alias='name')
+    """Race Name"""
+
+    start: int | float | None = Field(default=None, alias='start')
+    """Race start time in unix epoch milliseconds"""
+
+    end: int | float | None = Field(default=None, alias='end')
+    """Race end time in unix epoch milliseconds"""
+
+    total_scores: int | float | None = Field(default=None, alias='totalScores')
+    """The total number of scores submitted"""
+
+    leaderboard: str | None = Field(default=None, alias='leaderboard')
+    """URL to leaderboard data"""
+
+    metadata: str | None = Field(default=None, alias='metadata')
+    """URL to full Race metadata"""
+
+
+class Btd6raceleaderboard(BaseModel):
+    """Pydantic model for _btd6raceleaderboard"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """The display name for this user"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The Race score in milliseconds"""
+
+    score_parts: list | None = Field(default=None, alias='scoreParts')
+    """When the leaderboard includes multiple scores they will be included here"""
+
+    submission_time: int | float | None = Field(default=None, alias='submissionTime')
+    """The epoch time in milliseconds when the score was submitted (-1 when not available)"""
+
+    profile: str | None = Field(default=None, alias='profile')
+    """URL to the players public profile"""
+
+
+class Btd6challengedocument(BaseModel):
+    """Pydantic model for _btd6challengedocument"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Challenge Name"""
+
+    created_at: int | float | None = Field(default=None, alias='createdAt')
+    """Challenge creation time in unix epoch milliseconds"""
+
+    id: str | None = Field(default=None, alias='id')
+    """Unique Challenge ID"""
+
+    creator: str | None = Field(default=None, alias='creator')
+    """URL to the creators profile"""
+
+    game_version: str | None = Field(default=None, alias='gameVersion')
+    """Version of the game this challenge was created in"""
+
+    map: str | None = Field(default=None, alias='map')
+    """Map Name"""
+
+    map_url: str | None = Field(default=None, alias='mapURL')
+    """URL to the map icon"""
+
+    mode: str | None = Field(default=None, alias='mode')
+    """Game Mode"""
+
+    difficulty: str | None = Field(default=None, alias='difficulty')
+    """Challenge Difficulty"""
+
+    disable_double_cash: str | None = Field(default=None, alias='disableDoubleCash')
+    """true when Double Cash Mode is disabled"""
+
+    disable_instas: str | None = Field(default=None, alias='disableInstas')
+    """true when Instas are disabled"""
+
+    disable_mk: str | None = Field(default=None, alias='disableMK')
+    """true when Monkey Knowledge is disabled"""
+
+    disable_powers: str | None = Field(default=None, alias='disablePowers')
+    """true when Powers are disabled"""
+
+    disable_selling: str | None = Field(default=None, alias='disableSelling')
+    """true when Selling is disabled"""
+
+    starting_cash: int | float | None = Field(default=None, alias='startingCash')
+    """Starting cash value"""
+
+    lives: int | float | None = Field(default=None, alias='lives')
+    """Starting lives"""
+
+    max_lives: int | float | None = Field(default=None, alias='maxLives')
+    """Maximum allowed lives"""
+
+    max_towers: int | float | None = Field(default=None, alias='maxTowers')
+    """Maximum towers allowed"""
+
+    max_paragons: int | float | None = Field(default=None, alias='maxParagons')
+    """Maximum paragons allowed"""
+
+    start_round: int | float | None = Field(default=None, alias='startRound')
+    """Starting round"""
+
+    end_round: int | float | None = Field(default=None, alias='endRound')
+    """End Round"""
+
+    plays: int | float | None = Field(default=None, alias='plays')
+    """Total number of attempts"""
+
+    wins: int | float | None = Field(default=None, alias='wins')
+    """Total number of wins"""
+
+    losses: int | float | None = Field(default=None, alias='losses')
+    """Total number of losses"""
+
+    upvotes: int | float | None = Field(default=None, alias='upvotes')
+    """Total number of upvotes"""
+
+    plays_unique: int | float | None = Field(default=None, alias='playsUnique')
+    """Total number of unique attempts"""
+
+    restarts: int | float | None = Field(default=None, alias='restarts')
+    """Total number of restarts"""
+
+    wins_unique: int | float | None = Field(default=None, alias='winsUnique')
+    """Total number of unique player wins"""
+
+    losses_unique: int | float | None = Field(default=None, alias='lossesUnique')
+    """Total number of unique player losses"""
+
+    ability_cooldown_reduction_multiplier: int | float | None = Field(default=None, alias='abilityCooldownReductionMultiplier')
+    """Ability Cooldown Multiplier"""
+
+    least_cash_used: int | float | None = Field(default=None, alias='leastCashUsed')
+    """Least Cash Used Setting"""
+
+    least_tiers_used: int | float | None = Field(default=None, alias='leastTiersUsed')
+    """Least Tier Used"""
+
+    no_continues: int | float | None = Field(default=None, alias='noContinues')
+    """Are continues enabled"""
+
+    seed: int | float | None = Field(default=None, alias='seed')
+    """The RNG seed"""
+
+    removeable_cost_multiplier: int | float | None = Field(default=None, alias='removeableCostMultiplier')
+    """Blocker removal cost multiplier"""
+
+    round_sets: list[str] | None = Field(default=None, alias='roundSets')
+    """Bloon Round Information"""
+
+    powers_data: dict[str, Any] | None = Field(default=None, alias='_powers')
+    """[!] Power restrictions"""
+
+    bloon_modifiers_data: dict[str, Any] | None = Field(default=None, alias='_bloonModifiers')
+    """[!] Bloon Modifiers"""
+
+    towers_data: dict[str, Any] | None = Field(default=None, alias='_towers')
+    """[!] Tower restrictions"""
+
+
+class Btd6boss(BaseModel):
+    """Pydantic model for _btd6boss"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """Boss Event ID"""
+
+    name: str | None = Field(default=None, alias='name')
+    """Boss Name"""
+
+    start: int | float | None = Field(default=None, alias='start')
+    """Boss start time in unix epoch milliseconds"""
+
+    end: int | float | None = Field(default=None, alias='end')
+    """Boss end time in unix epoch milliseconds"""
+
+    boss_type: str | None = Field(default=None, alias='bossType')
+    """The name of the Boss"""
+
+    boss_type_url: str | None = Field(default=None, alias='bossTypeURL')
+    """Boss Icon"""
+
+    total_scores_standard: int | float | None = Field(default=None, alias='totalScores_standard')
+    """Total scores in the Standard leaderboard"""
+
+    total_scores_elite: int | float | None = Field(default=None, alias='totalScores_elite')
+    """Total scores in the Elite leaderboard"""
+
+    leaderboard_standard_players_1: str | None = Field(default=None, alias='leaderboard_standard_players_1')
+    """URL to Elite Difficulty Single Player leaderboard data"""
+
+    leaderboard_elite_players_1: str | None = Field(default=None, alias='leaderboard_elite_players_1')
+    """URL to Elite Difficulty Single Player leaderboard data"""
+
+    metadata_standard: str | None = Field(default=None, alias='metadataStandard')
+    """URL to full metadata for Standard Mode"""
+
+    metadata_elite: str | None = Field(default=None, alias='metadataElite')
+    """URL to full metadata for Elite Mode"""
+
+    scoring_type: str | None = Field(default=None, alias='scoringType')
+    """[Deprecated] - Use normalScoringType and eliteScoringType."""
+
+    normal_scoring_type: str | None = Field(default=None, alias='normalScoringType')
+    """The score type for this leaderboard when playing standard mode."""
+
+    elite_scoring_type: str | None = Field(default=None, alias='eliteScoringType')
+    """No description available."""
+
+
+class Btd6bossleaderboard(BaseModel):
+    """Pydantic model for _btd6bossleaderboard"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """The display name for this user"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The Boss score in milliseconds (lower is better)"""
+
+    score_parts: list | None = Field(default=None, alias='scoreParts')
+    """When the leaderboard includes multiple scores they will be included here"""
+
+    submission_time: int | float | None = Field(default=None, alias='submissionTime')
+    """The epoch time in milliseconds"""
+
+    profile: str | None = Field(default=None, alias='profile')
+    """URL to the players public profile"""
+
+
+class Btd6userprofile(BaseModel):
+    """Pydantic model for _btd6userprofile"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """Current User Display Name"""
+
+    rank: int | float | None = Field(default=None, alias='rank')
+    """Player Rank"""
+
+    veteran_rank: int | float | None = Field(default=None, alias='veteranRank')
+    """Player Veteran Rank"""
+
+    achievements: str | None = Field(default=None, alias='achievements')
+    """Number of achievements unlocked"""
+
+    most_experienced_monkey: str | None = Field(default=None, alias='mostExperiencedMonkey')
+    """Most Experienced Monkey"""
+
+    highest_round: int | float | None = Field(default=None, alias='highestRound')
+    """[Deprecated] Use gameplay.highestRound"""
+
+    avatar: str | None = Field(default=None, alias='avatar')
+    """User avatar icon"""
+
+    banner: str | None = Field(default=None, alias='banner')
+    """User banner icon"""
+
+    avatar_url: str | None = Field(default=None, alias='avatarURL')
+    """URL to avatar icon"""
+
+    banner_url: str | None = Field(default=None, alias='bannerURL')
+    """URL to banner icon"""
+
+    followers: int | float | None = Field(default=None, alias='followers')
+    """Number of followers"""
+
+    bloons_popped: dict[str, Any] | None = Field(default=None, alias='bloonsPopped')
+    """Bloon Pop Stats"""
+
+    gameplay: dict[str, Any] | None = Field(default=None, alias='gameplay')
+    """Gameplay Stats"""
+
+    heroes_placed: dict[str, Any] | None = Field(default=None, alias='heroesPlaced')
+    """Hero Stats"""
+
+    towers_placed: dict[str, Any] | None = Field(default=None, alias='towersPlaced')
+    """Tower Stats"""
+
+    stats: dict[str, Any] | None = Field(default=None, alias='stats')
+    """A number of miscellaneous stats"""
+
+    boss_badges_normal: dict[str, Any] | None = Field(default=None, alias='bossBadgesNormal')
+    """Normal Boss Badges"""
+
+    boss_badges_elite: dict[str, Any] | None = Field(default=None, alias='bossBadgesElite')
+    """Normal Boss Badges"""
+
+    medals_single_player_data: dict[str, Any] | None = Field(default=None, alias='_medalsSinglePlayer')
+    """[!] Single Player Medals"""
+
+    medals_multiplayer_data: dict[str, Any] | None = Field(default=None, alias='_medalsMultiplayer')
+    """[!] Multiplayer Medals"""
+
+    medals_boss_data: dict[str, Any] | None = Field(default=None, alias='_medalsBoss')
+    """[!] Boss Medals"""
+
+    medals_boss_elite_data: dict[str, Any] | None = Field(default=None, alias='_medalsBossElite')
+    """[!] Elite Boss Medals"""
+
+    medals_ct_local_data: dict[str, Any] | None = Field(default=None, alias='_medalsCTLocal')
+    """[!] CT Local Medals"""
+
+    medals_ct_global_data: dict[str, Any] | None = Field(default=None, alias='_medalsCTGlobal')
+    """[!] CT Global Medals"""
+
+    medals_race_data: dict[str, Any] | None = Field(default=None, alias='_medalsRace')
+    """[!] Race Medals"""
+
+
+class Btd6challengetype(BaseModel):
+    """Pydantic model for _btd6challengetype"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    type: str | None = Field(default=None, alias='type')
+    """Challenge Filter Name"""
+
+    challenges: str | None = Field(default=None, alias='challenges')
+    """URL to view challenges with this filter"""
+
+
+class Btd6challenge(BaseModel):
+    """Pydantic model for _btd6challenge"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Challenge Filter Name"""
+
+    created_at: int | float | None = Field(default=None, alias='createdAt')
+    """Challenge creation time in unix epoch milliseconds"""
+
+    id: str | None = Field(default=None, alias='id')
+    """Unique Challenge ID"""
+
+    creator: str | None = Field(default=None, alias='creator')
+    """URL to the creators profile"""
+
+    metadata: str | None = Field(default=None, alias='metadata')
+    """URL to the full challenge information"""
+
+
+class Btd6ct(BaseModel):
+    """Pydantic model for _btd6ct"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """CT Event ID"""
+
+    start: int | float | None = Field(default=None, alias='start')
+    """Event start time in unix epoch milliseconds"""
+
+    end: int | float | None = Field(default=None, alias='end')
+    """Event end time in unix epoch milliseconds"""
+
+    total_scores_player: int | float | None = Field(default=None, alias='totalScores_player')
+    """Total scores in the Player leaderboard"""
+
+    total_scores_team: int | float | None = Field(default=None, alias='totalScores_team')
+    """Total scores in the Team leaderboard"""
+
+    tiles: str | None = Field(default=None, alias='tiles')
+    """URL to Information about each CT tile"""
+
+    leaderboard_player: str | None = Field(default=None, alias='leaderboard_player')
+    """URL to Top Player leaderboard"""
+
+    leaderboard_team: str | None = Field(default=None, alias='leaderboard_team')
+    """URL to Top Team leaderboard"""
+
+
+class Btd6cttile(BaseModel):
+    """Pydantic model for _btd6cttile"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """The CT ID"""
+
+    tiles: list | None = Field(default=None, alias='tiles')
+    """A list of CT tiles"""
+
+
+class Btd6ctleaderboardplayer(BaseModel):
+    """Pydantic model for _btd6ctleaderboardplayer"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """The display name for this user"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The CT score"""
+
+    profile: str | None = Field(default=None, alias='profile')
+    """URL to the players public profile"""
+
+
+class Btd6ctleaderboardteam(BaseModel):
+    """Pydantic model for _btd6ctleaderboardteam"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """The display name for this Team"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The CT score"""
+
+    profile: str | None = Field(default=None, alias='profile')
+    """URL to the team public profile"""
+
+    group: str | None = Field(default=None, alias='group')
+    """URL to the team's group leaderboard'"""
+
+
+class Btd6guildprofile(BaseModel):
+    """Pydantic model for _btd6guildprofile"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Guild Name"""
+
+    owner: str | None = Field(default=None, alias='owner')
+    """URL to the Owners public profile"""
+
+    num_members: int | float | None = Field(default=None, alias='numMembers')
+    """Number of players in Team"""
+
+    status: str | None = Field(default=None, alias='status')
+    """Status of the Team (OPEN, FILTERED, DISBANDED, CLOSED)"""
+
+    banner: str | None = Field(default=None, alias='banner')
+    """Banner Icon Name"""
+
+    frame: str | None = Field(default=None, alias='frame')
+    """Frame Icon Name"""
+
+    icon: str | None = Field(default=None, alias='icon')
+    """Team Icon Name"""
+
+    banner_url: str | None = Field(default=None, alias='bannerURL')
+    """URL to banner icon"""
+
+    frame_url: str | None = Field(default=None, alias='frameURL')
+    """URL to frame icon"""
+
+    icon_url: str | None = Field(default=None, alias='iconURL')
+    """URL to icon"""
+
+
+class Btd6odyssey(BaseModel):
+    """Pydantic model for _btd6odyssey"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """Odyssey Event ID"""
+
+    name: str | None = Field(default=None, alias='name')
+    """Odyssey Name"""
+
+    description: str | None = Field(default=None, alias='description')
+    """Odyssey Description"""
+
+    start: int | float | None = Field(default=None, alias='start')
+    """Odyssey start time in unix epoch milliseconds"""
+
+    end: int | float | None = Field(default=None, alias='end')
+    """Odyssey end time in unix epoch milliseconds"""
+
+    metadata_easy: Any | None = Field(default=None, alias='metadata_easy')
+    """URL to Easy Mode Settings"""
+
+    metadata_medium: Any | None = Field(default=None, alias='metadata_medium')
+    """URL to Medium Mode Settings"""
+
+    metadata_hard: Any | None = Field(default=None, alias='metadata_hard')
+    """URL to Hard Mode Settings"""
+
+
+class Btd6odysseymetadata(BaseModel):
+    """Pydantic model for _btd6odysseymetadata"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """Odyssey Event ID"""
+
+    is_extreme: str | None = Field(default=None, alias='isExtreme')
+    """True when the Odyssey is extreme"""
+
+    max_monkey_seats: int | float | None = Field(default=None, alias='maxMonkeySeats')
+    """Maximum seats on the boat"""
+
+    max_monkeys_on_boat: int | float | None = Field(default=None, alias='maxMonkeysOnBoat')
+    """Maximum towers"""
+
+    max_power_slots: int | float | None = Field(default=None, alias='maxPowerSlots')
+    """Maximum number of powers"""
+
+    starting_health: int | float | None = Field(default=None, alias='startingHealth')
+    """Voyage starting health"""
+
+    rewards_data: dict[str, Any] | None = Field(default=None, alias='_rewards')
+    """[!] Rewards list"""
+
+    available_powers_data: dict[str, Any] | None = Field(default=None, alias='_availablePowers')
+    """[!] Powers that can be chosen"""
+
+    available_towers_data: dict[str, Any] | None = Field(default=None, alias='_availableTowers')
+    """[!] Towers that can be chosen"""
+
+    default_powers_data: dict[str, Any] | None = Field(default=None, alias='_defaultPowers')
+    """[!] Default event powers"""
+
+    default_towers_data: dict[str, Any] | None = Field(default=None, alias='_defaultTowers')
+    """[!] Defauly Towers"""
+
+    maps: Any | None = Field(default=None, alias='maps')
+    """URL to map information"""
+
+
+class Btd6usersave(BaseModel):
+    """Pydantic model for _btd6usersave"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    latest_game_version: str | None = Field(default=None, alias='latestGameVersion')
+    """The latest version of the game that this player has played"""
+
+    tower_xp: dict[str, Any] | None = Field(default=None, alias='towerXP')
+    """Tower XP"""
+
+    acquired_upgrades: dict[str, Any] | None = Field(default=None, alias='acquiredUpgrades')
+    """Upgrades Unlocked"""
+
+    acquired_knowledge: dict[str, Any] | None = Field(default=None, alias='acquiredKnowledge')
+    """Upgrades Monkey Knowledge"""
+
+    unlocked_towers: dict[str, Any] | None = Field(default=None, alias='unlockedTowers')
+    """Towers Unlocked"""
+
+    unlocked_heroes: dict[str, Any] | None = Field(default=None, alias='unlockedHeroes')
+    """Towers Heros Unlocked"""
+
+    unlocked_heros: dict[str, Any] | None = Field(default=None, alias='unlockedHeros')
+    """[Deprecated] - Use unlockedHeroes"""
+
+    unlocked_skins: dict[str, Any] | None = Field(default=None, alias='unlockedSkins')
+    """Towers Hero Skins Unlocked"""
+
+    games_played: int | float | None = Field(default=None, alias='gamesPlayed')
+    """Total Games Played"""
+
+    powers: dict[str, Any] | None = Field(default=None, alias='powers')
+    """Powers Unlocked"""
+
+    powers_pro: dict[str, Any] | None = Field(default=None, alias='powersPro')
+    """Powers Unlocked"""
+
+    insta_towers: dict[str, Any] | None = Field(default=None, alias='instaTowers')
+    """Insta Towers (tier & count)"""
+
+    monkey_money: int | float | None = Field(default=None, alias='monkeyMoney')
+    """Current Monkey Money"""
+
+    xp: int | float | None = Field(default=None, alias='xp')
+    """Current XP"""
+
+    rank: int | float | None = Field(default=None, alias='rank')
+    """Current Rank"""
+
+    veteran_xp: int | float | None = Field(default=None, alias='veteranXp')
+    """Current Veteran XP"""
+
+    veteran_rank: int | float | None = Field(default=None, alias='veteranRank')
+    """Current Veteran Rank"""
+
+    trophies: int | float | None = Field(default=None, alias='trophies')
+    """Current Trophies"""
+
+    lifetime_trophies: int | float | None = Field(default=None, alias='lifetimeTrophies')
+    """Total trophies earned"""
+
+    lifetime_team_trophies: int | float | None = Field(default=None, alias='lifetimeTeamTrophies')
+    """Total Team Trophies Earned"""
+
+    knowledge_points: int | float | None = Field(default=None, alias='knowledgePoints')
+    """Current MK Points"""
+
+    primary_hero: str | None = Field(default=None, alias='primaryHero')
+    """Current Selected Hero"""
+
+    achievements_claimed: list | None = Field(default=None, alias='achievementsClaimed')
+    """Achievements Claimed"""
+
+    highest_seen_round: int | float | None = Field(default=None, alias='highestSeenRound')
+    """Highest Ever Round"""
+
+    daily_reward_count: int | float | None = Field(default=None, alias='dailyRewardCount')
+    """Daily Rewards Claimed"""
+
+    total_daily_challenges_completed: int | float | None = Field(default=None, alias='totalDailyChallengesCompleted')
+    """Total DC's completed"""
+
+    consecutive_daily_challenges_completed: int | float | None = Field(default=None, alias='consecutiveDailyChallengesCompleted')
+    """Current number of consecutive days a DC has been completed"""
+
+    total_races_entered: int | float | None = Field(default=None, alias='totalRacesEntered')
+    """Total Races Entered"""
+
+    challenges_played: int | float | None = Field(default=None, alias='challengesPlayed')
+    """Total Challenges Played"""
+
+    challenges_shared: int | float | None = Field(default=None, alias='challengesShared')
+    """Total Challenges Shared"""
+
+    total_completed_odysseys: int | float | None = Field(default=None, alias='totalCompletedOdysseys')
+    """Total Odysseys Complete"""
+
+    unlocked_big_bloons: bool | None = Field(default=None, alias='unlockedBigBloons')
+    """true when Big Bloons has been unlocked"""
+
+    big_bloons_active: bool | None = Field(default=None, alias='bigBloonsActive')
+    """true when Big Bloons is active"""
+
+    unlocked_small_bloons: bool | None = Field(default=None, alias='unlockedSmallBloons')
+    """true when Small Bloons has been unlocked"""
+
+    small_bloons_active: bool | None = Field(default=None, alias='smallBloonsActive')
+    """true when Small Bloons is active"""
+
+    seen_big_towers: bool | None = Field(default=None, alias='seenBigTowers')
+    """true when Big Bloons has been unlocked"""
+
+    big_towers_active: bool | None = Field(default=None, alias='bigTowersActive')
+    """true when Big Bloons is active"""
+
+    unlocked_small_towers: bool | None = Field(default=None, alias='unlockedSmallTowers')
+    """true when Small Bloons has been unlocked"""
+
+    small_towers_active: bool | None = Field(default=None, alias='smallTowersActive')
+    """true when Small Bloons is active"""
+
+    unlocked_small_bosses: bool | None = Field(default=None, alias='unlockedSmallBosses')
+    """true when Small Bosses has been unlocked"""
+
+    small_bosses_active: bool | None = Field(default=None, alias='smallBossesActive')
+    """true when Small Bosses is active"""
+
+    named_monkeys: dict[str, Any] | None = Field(default=None, alias='namedMonkeys')
+    """Named Monkey Names (note: Ninja Kiwi is not responsible for these names but they can be reported at https://support.ninjakiwi.com)"""
+
+    collection_event_crates_opened: int | float | None = Field(default=None, alias='collectionEventCratesOpened')
+    """Collect event crates opened"""
+
+    continues_used: int | float | None = Field(default=None, alias='continuesUsed')
+    """Continues Used"""
+
+    trophy_store_items: dict[str, Any] | None = Field(default=None, alias='trophyStoreItems')
+    """Trophy Store Items Purchased"""
+
+    map_progress: dict[str, Any] | None = Field(default=None, alias='mapProgress')
+    """A list of maps completed split by single/coop mode and difficulty."""
+
+    rogue_legends: dict[str, Any] | None = Field(default=None, alias='rogueLegends')
+    """Rogue Legends Stats"""
+
+    quests: list | None = Field(default=None, alias='quests')
+    """Quest Information"""
+
+
+class Btd6maptype(BaseModel):
+    """Pydantic model for _btd6maptype"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    type: str | None = Field(default=None, alias='type')
+    """Map Filter Name"""
+
+    maps: str | None = Field(default=None, alias='maps')
+    """URL to view maps with this filter"""
+
+
+class Btd6map(BaseModel):
+    """Pydantic model for _btd6map"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Map Filter Name"""
+
+    created_at: int | float | None = Field(default=None, alias='createdAt')
+    """Map creation time in unix epoch milliseconds"""
+
+    id: str | None = Field(default=None, alias='id')
+    """Unique Map ID"""
+
+    creator: str | None = Field(default=None, alias='creator')
+    """URL to the creators profile"""
+
+    metadata: str | None = Field(default=None, alias='metadata')
+    """URL to the full map information"""
+
+
+class Btd6mapdocument(BaseModel):
+    """Pydantic model for _btd6mapdocument"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Map Name"""
+
+    created_at: int | float | None = Field(default=None, alias='createdAt')
+    """Map creation time in unix epoch milliseconds"""
+
+    id: str | None = Field(default=None, alias='id')
+    """Unique Map ID"""
+
+    creator: str | None = Field(default=None, alias='creator')
+    """URL to the creators profile"""
+
+    game_version: str | None = Field(default=None, alias='gameVersion')
+    """Version of the game this map was created in"""
+
+    map: str | None = Field(default=None, alias='map')
+    """Map Name"""
+
+    map_url: str | None = Field(default=None, alias='mapURL')
+    """URL to the map icon"""
+
+    plays: int | float | None = Field(default=None, alias='plays')
+    """Total number of attempts"""
+
+    wins: int | float | None = Field(default=None, alias='wins')
+    """Total number of wins"""
+
+    losses: int | float | None = Field(default=None, alias='losses')
+    """Total number of losses"""
+
+    upvotes: int | float | None = Field(default=None, alias='upvotes')
+    """Total number of upvotes"""
+
+    plays_unique: int | float | None = Field(default=None, alias='playsUnique')
+    """Total number of unique attempts"""
+
+    restarts: int | float | None = Field(default=None, alias='restarts')
+    """Total number of restarts"""
+
+    wins_unique: int | float | None = Field(default=None, alias='winsUnique')
+    """Total number of unique player wins"""
+
+    losses_unique: int | float | None = Field(default=None, alias='lossesUnique')
+    """Total number of unique player losses"""
+
+
+class Battles2hom(BaseModel):
+    """Pydantic model for _battles2hom"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """HoM Event ID"""
+
+    name: str | None = Field(default=None, alias='name')
+    """Season Name"""
+
+    start: int | float | None = Field(default=None, alias='start')
+    """Event start time in unix epoch milliseconds"""
+
+    end: int | float | None = Field(default=None, alias='end')
+    """Event end time in unix epoch milliseconds"""
+
+    live: bool | None = Field(default=None, alias='live')
+    """When 'true', this is the live in-game HoM event"""
+
+    total_scores: int | float | None = Field(default=None, alias='totalScores')
+    """The total number of scores submitted"""
+
+    leaderboard: str | None = Field(default=None, alias='leaderboard')
+    """URL to leaderboard data"""
+
+
+class Battles2homleaderboard(BaseModel):
+    """Pydantic model for _battles2homleaderboard"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """The display name for this user"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The HoM score"""
+
+    profile: str | None = Field(default=None, alias='profile')
+    """URL to the players public profile"""
+
+    currently_in_ho_m: bool | None = Field(default=None, alias='currentlyInHoM')
+    """When true, the player is currenty in the HoM. This might be false if the user has been demoted from HoM by finishing in the demotion zone of an arena league"""
+
+
+class Battles2userprofile(BaseModel):
+    """Pydantic model for _battles2userprofile"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    display_name: str | None = Field(default=None, alias='displayName')
+    """User Display Name"""
+
+    is_vip: bool | None = Field(default=None, alias='is_vip')
+    """VIP Status (deprecated)"""
+
+    is_club_member: bool | None = Field(default=None, alias='is_club_member')
+    """Club Membership Status"""
+
+    equipped_avatar: str | None = Field(default=None, alias='equippedAvatar')
+    """Selected avatar"""
+
+    equipped_avatar_url: str | None = Field(default=None, alias='equippedAvatarURL')
+    """Avatar Icon"""
+
+    equipped_banner: str | None = Field(default=None, alias='equippedBanner')
+    """Selected Banner"""
+
+    equipped_banner_url: str | None = Field(default=None, alias='equippedBannerURL')
+    """Banner Icon"""
+
+    equipped_border: str | None = Field(default=None, alias='equippedBorder')
+    """Selected Border"""
+
+    equipped_border_url: str | None = Field(default=None, alias='equippedBorderURL')
+    """Border Icon"""
+
+    equipped_title: str | None = Field(default=None, alias='equippedTitle')
+    """Selected Title"""
+
+    casual_stats: dict[str, Any] | None = Field(default=None, alias='casualStats')
+    """User Display Name"""
+
+    ranked_stats: dict[str, Any] | None = Field(default=None, alias='rankedStats')
+    """User Display Name"""
+
+    badges_equipped: Any | None = Field(default=None, alias='badges_equipped')
+    """Currently Equpped badges"""
+
+    badges_all: Any | None = Field(default=None, alias='badges_all')
+    """All Badges"""
+
+    chests: list[str] | None = Field(default=None, alias='chests')
+    """Pending Chests"""
+
+    chests_opened: int | float | None = Field(default=None, alias='chestsOpened')
+    """Total Chests Opened"""
+
+    current_season: str | None = Field(default=None, alias='currentSeason')
+    """The most recent season the user has played in"""
+
+    current_season_highest_arena_index: int | float | None = Field(default=None, alias='currentSeason_highestArenaIndex')
+    """Numerical Representation of Highest Arena Reached"""
+
+    current_season_highest_arena: str | None = Field(default=None, alias='currentSeason_highestArena')
+    """Highest Arena Reached during the most recent event"""
+
+    current_season_trophies: int | float | None = Field(default=None, alias='currentSeason_trophies')
+    """Current Season Trophies"""
+
+    lifetime_highest_arena_index: int | float | None = Field(default=None, alias='lifetime_highestArenaIndex')
+    """Numerical Representation of Highest Arena reached across all seasons"""
+
+    lifetime_highest_arena: str | None = Field(default=None, alias='lifetime_highestArena')
+    """Highest Arena reached across all seasons"""
+
+    lifetime_trophies: int | float | None = Field(default=None, alias='lifetime_trophies')
+    """Highest Trophies across all seasons"""
+
+    matches: str | None = Field(default=None, alias='matches')
+    """Recent match information"""
+
+    homs: str | None = Field(default=None, alias='homs')
+    """Recent HoM leaderboard scores"""
+
+    in_guild: bool | None = Field(default=None, alias='inGuild')
+    """True when the player is part of a guild"""
+
+    guild: str | None = Field(default=None, alias='guild')
+    """URL to guild profile"""
+
+    accolades: Any | None = Field(default=None, alias='accolades')
+    """All Accolades"""
+
+    arena_league_tier: int | float | None = Field(default=None, alias='arenaLeagueTier')
+    """The players current arena league. Tiers start at RBC=0 through HOM=8"""
+
+    bloon_stats_data: dict[str, Any] | None = Field(default=None, alias='_bloonStats')
+    """User Display Name"""
+
+    towers_data: dict[str, Any] | None = Field(default=None, alias='_towers')
+    """Tower Usage Stats"""
+
+
+class Battles2usermap(BaseModel):
+    """Pydantic model for _battles2usermap"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """A unique ID for this match"""
+
+    gametype: str | None = Field(default=None, alias='gametype')
+    """Match type"""
+
+    map: str | None = Field(default=None, alias='map')
+    """Map Name"""
+
+    duration: int | float | None = Field(default=None, alias='duration')
+    """Duration of the match in seconds"""
+
+    end_round: int | float | None = Field(default=None, alias='endRound')
+    """Round the match ended"""
+
+    player_left: dict[str, Any] | None = Field(default=None, alias='playerLeft')
+    """Details about the Left Side Player"""
+
+    player_right: dict[str, Any] | None = Field(default=None, alias='playerRight')
+    """Details about the Right Side Player"""
+
+    map_url: str | None = Field(default=None, alias='mapURL')
+    """Map Icon URL"""
+
+
+class Battles2userhomrank(BaseModel):
+    """Pydantic model for _battles2userhomrank"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: str | None = Field(default=None, alias='id')
+    """HoM Event ID"""
+
+    name: str | None = Field(default=None, alias='name')
+    """HoM Season Name"""
+
+    season: str | None = Field(default=None, alias='season')
+    """HoM Season Index"""
+
+    rank: int | float | None = Field(default=None, alias='rank')
+    """The players current rank (1 = top)"""
+
+    score: int | float | None = Field(default=None, alias='score')
+    """The users current HoM score"""
+
+    total_scores: int | float | None = Field(default=None, alias='totalScores')
+    """Total players in the HoM"""
+
+    leaderboard: str | None = Field(default=None, alias='leaderboard')
+    """URL to the full leaderboard data"""
+
+
+class Battles2guild(BaseModel):
+    """Pydantic model for _battles2guild"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    name: str | None = Field(default=None, alias='name')
+    """Guild Name"""
+
+    num_members: int | float | None = Field(default=None, alias='numMembers')
+    """The number of members currently in the guild"""
+
+    status: str | None = Field(default=None, alias='status')
+    """The current status of the guild. Can be OPEN|FILTERED|CLOSED|DISBANDED"""
+
+    owner: str | None = Field(default=None, alias='owner')
+    """The guild owner's profile"""
+
+    tagline: str | None = Field(default=None, alias='tagline')
+    """Guilds' tagline. Ninja Kiwi is not responsible for any content from services linked to from taglines"""
+
+    banner: str | None = Field(default=None, alias='banner')
+    """The Guild Banner"""
+
+    banner_url: str | None = Field(default=None, alias='bannerURL')
+    """The Guild Banner"""
+
+    wars: str | None = Field(default=None, alias='wars')
+    """Recent wars this guild has taken part in"""
+
+
+class Battles2guildwar(BaseModel):
+    """Pydantic model for _battles2guildwar"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    event_state: str | None = Field(default=None, alias='eventState')
+    """The curent event state. Can be NOT_STARTED,WAR_WARMUP,WAR_RUNNING,WAR_GRACE_PERIOD,WAR_FINISHED"""
+
+    reward_state: str | None = Field(default=None, alias='rewardState')
+    """After a war, you can check if rewards have been given out. Can be TOO_EARLY,PROCESSING,FINISHED"""
+
+    tier: int | float | None = Field(default=None, alias='tier')
+    """The guild's tier in this event"""
+
+    next_match_epoch: int | float | None = Field(default=None, alias='nextMatchEpoch')
+    """Unix epoch timestamp. This is when the daily matches will reset"""
+
+    group_guild_leaderboard: Any | None = Field(default=None, alias='groupGuildLeaderboard')
+    """An array of guild scores for all the guilds in this group"""
+
+    member_contributions_leaderboard: Any | None = Field(default=None, alias='memberContributionsLeaderboard')
+    """An array of scores. This represents the medallions won be each player in the current guild. This can include members not currently in the guild if they won a match but left during the event"""
+
+
+# --- API Client Class ---
+class NinjaKiwiAPI:
+    """
+    An asynchronous Python wrapper for the Bloons TD 6 and Battles 2 Data API.
+    This wrapper was auto-generated from the API documentation.
+    """
+    def __init__(self, base_url="https://data.ninjakiwi.com"):
+        self.client = httpx.AsyncClient(base_url=base_url, follow_redirects=True)
+
+    async def _get_request(self, endpoint: str) -> Any | None:
+        """Internal method to handle GET requests."""
+        try:
+            response = await self.client.get(endpoint)
+            response.raise_for_status()
+            data = response.json()
+            if data and data.get('error'):
+                print(f"API Error for {endpoint}: {data['error']}")
+                return None
+            return data.get('body')
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP Error for endpoint '{endpoint}': {e}")
+            return None
+        except (httpx.RequestError, json.JSONDecodeError) as e:
+            print(f"An error occurred with endpoint '{endpoint}': {e}")
+            return None
+
+    async def close(self):
+        """Closes the httpx client."""
+        await self.client.aclose()
+
+
+    async def get_btd6_races(self) -> list[Btd6race] | None:
+        """
+        A list of all available Race events
+        URL: https://data.ninjakiwi.com/btd6/races
+        """
+        endpoint = f"btd6/races"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6race.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_races_by_race_id_leaderboard(self, race_id: str) -> list[Btd6raceleaderboard] | None:
+        """
+        A race leaderboard
+        URL: https://data.ninjakiwi.com/btd6/races/:raceID/leaderboard
+        """
+        endpoint = f"btd6/races/{race_id}/leaderboard"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6raceleaderboard.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_races_by_race_id_metadata(self, race_id: str) -> Btd6challengedocument | None:
+        """
+        Metadata for a race event
+        URL: https://data.ninjakiwi.com/btd6/races/:raceID/metadata
+        """
+        endpoint = f"btd6/races/{race_id}/metadata"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6challengedocument.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_bosses(self) -> list[Btd6boss] | None:
+        """
+        List all available Boss events
+        URL: https://data.ninjakiwi.com/btd6/bosses
+        """
+        endpoint = f"btd6/bosses"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6boss.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_bosses_by_boss_id_leaderboard_by_type_by_team_size(self, boss_id: str, type: str, team_size: str) -> list[Btd6bossleaderboard] | None:
+        """
+        Load a Boss event leaderboard
+        URL: https://data.ninjakiwi.com/btd6/bosses/:bossID/leaderboard/:type/:teamSize
+        """
+        endpoint = f"btd6/bosses/{boss_id}/leaderboard/{type}/{team_size}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6bossleaderboard.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_bosses_by_boss_id_metadata_by_difficulty(self, boss_id: str, difficulty: str) -> Btd6challengedocument | None:
+        """
+        Load Boss event Metadata
+        URL: https://data.ninjakiwi.com/btd6/bosses/:bossID/metadata/:difficulty
+        """
+        endpoint = f"btd6/bosses/{boss_id}/metadata/{difficulty}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6challengedocument.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_users_by_user_id(self, user_id: str) -> Btd6userprofile | None:
+        """
+        Load information about a BTD6 Player
+        URL: https://data.ninjakiwi.com/btd6/users/:userID
+        """
+        endpoint = f"btd6/users/{user_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6userprofile.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_challenges(self) -> list[Btd6challengetype] | None:
+        """
+        List all available Challenge Filters
+        URL: https://data.ninjakiwi.com/btd6/challenges
+        """
+        endpoint = f"btd6/challenges"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6challengetype.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_challenges_filter_by_challenge_filter(self, challenge_filter: str) -> list[Btd6challenge] | None:
+        """
+        List challenges based on a filter
+        URL: https://data.ninjakiwi.com/btd6/challenges/filter/:challengeFilter
+        """
+        endpoint = f"btd6/challenges/filter/{challenge_filter}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6challenge.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_challenges_challenge_by_challenge_id(self, challenge_id: str) -> Btd6challengedocument | None:
+        """
+        Get specific information about a challenge
+        URL: https://data.ninjakiwi.com/btd6/challenges/challenge/:challengeID
+        """
+        endpoint = f"btd6/challenges/challenge/{challenge_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6challengedocument.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_ct(self) -> list[Btd6ct] | None:
+        """
+        Load information about current and historical CT events
+        URL: https://data.ninjakiwi.com/btd6/ct
+        """
+        endpoint = f"btd6/ct"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6ct.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_ct_by_ct_id_tiles(self, ct_id: str) -> Btd6cttile | None:
+        """
+        Load Information about the tiles from a CT event
+        URL: https://data.ninjakiwi.com/btd6/ct/:ctID/tiles
+        """
+        endpoint = f"btd6/ct/{ct_id}/tiles"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6cttile.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_ct_by_ct_id_leaderboard_player(self, ct_id: str) -> list[Btd6ctleaderboardplayer] | None:
+        """
+        Load Top Player Leaderboard for a CT event
+        URL: https://data.ninjakiwi.com/btd6/ct/:ctID/leaderboard/player
+        """
+        endpoint = f"btd6/ct/{ct_id}/leaderboard/player"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6ctleaderboardplayer.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_ct_by_ct_id_leaderboard_team(self, ct_id: str) -> list[Btd6ctleaderboardteam] | None:
+        """
+        Load Top Team Leaderboard for a CT event
+        URL: https://data.ninjakiwi.com/btd6/ct/:ctID/leaderboard/team
+        """
+        endpoint = f"btd6/ct/{ct_id}/leaderboard/team"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6ctleaderboardteam.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_ct_by_ct_id_leaderboard_group_by_group_id(self, ct_id: str, group_id: str) -> list[Btd6ctleaderboardteam] | None:
+        """
+        Load information about a Team's group
+        URL: https://data.ninjakiwi.com/btd6/ct/:ctID/leaderboard/group/:groupID
+        """
+        endpoint = f"btd6/ct/{ct_id}/leaderboard/group/{group_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6ctleaderboardteam.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_guild_by_guild_id(self, guild_id: str) -> Btd6guildprofile | None:
+        """
+        Load information about a BTD6 Team
+        URL: https://data.ninjakiwi.com/btd6/guild/:guildID
+        """
+        endpoint = f"btd6/guild/{guild_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6guildprofile.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_odyssey(self) -> list[Btd6odyssey] | None:
+        """
+        A list of all available Odyssey events
+        URL: https://data.ninjakiwi.com/btd6/odyssey
+        """
+        endpoint = f"btd6/odyssey"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6odyssey.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_odyssey_by_odyssey_id_by_difficulty(self, odyssey_id: str, difficulty: str) -> Btd6odysseymetadata | None:
+        """
+        A odyssey event metadata
+        URL: https://data.ninjakiwi.com/btd6/odyssey/:odysseyID/:difficulty
+        """
+        endpoint = f"btd6/odyssey/{odyssey_id}/{difficulty}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6odysseymetadata.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_odyssey_by_odyssey_id_by_difficulty_maps(self, odyssey_id: str, difficulty: str) -> list[Btd6challengedocument] | None:
+        """
+        A odyssey event map information
+        URL: https://data.ninjakiwi.com/btd6/odyssey/:odysseyID/:difficulty/maps
+        """
+        endpoint = f"btd6/odyssey/{odyssey_id}/{difficulty}/maps"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6challengedocument.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_save_by_oak_id(self, oak_id: str) -> Btd6usersave | None:
+        """
+        Load detailed information about a players' progress. Requires an OAK Token from the player
+        URL: https://data.ninjakiwi.com/btd6/save/:oakID
+        """
+        endpoint = f"btd6/save/{oak_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6usersave.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_maps(self) -> list[Btd6maptype] | None:
+        """
+        List all map filters
+        URL: https://data.ninjakiwi.com/btd6/maps
+        """
+        endpoint = f"btd6/maps"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6maptype.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_maps_filter_by_map_filter(self, map_filter: str) -> list[Btd6map] | None:
+        """
+        List maps based on a filter
+        URL: https://data.ninjakiwi.com/btd6/maps/filter/:mapFilter
+        """
+        endpoint = f"btd6/maps/filter/{map_filter}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Btd6map.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_btd6_maps_map_by_map_id(self, map_id: str) -> Btd6mapdocument | None:
+        """
+        Get specific information about a map
+        URL: https://data.ninjakiwi.com/btd6/maps/map/:mapID
+        """
+        endpoint = f"btd6/maps/map/{map_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Btd6mapdocument.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_homs(self) -> list[Battles2hom] | None:
+        """
+        A list of current Hall of Masters events
+        URL: https://data.ninjakiwi.com/battles2/homs
+        """
+        endpoint = f"battles2/homs"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Battles2hom.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_homs_by_hom_id_leaderboard(self, hom_id: str) -> list[Battles2homleaderboard] | None:
+        """
+        A HoM leaderboard
+        URL: https://data.ninjakiwi.com/battles2/homs/:homID/leaderboard
+        """
+        endpoint = f"battles2/homs/{hom_id}/leaderboard"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Battles2homleaderboard.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_users_by_user_id(self, user_id: str) -> Battles2userprofile | None:
+        """
+        Information about a Battles 2 Player
+        URL: https://data.ninjakiwi.com/battles2/users/:userID
+        """
+        endpoint = f"battles2/users/{user_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Battles2userprofile.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_users_by_user_id_matches(self, user_id: str) -> list[Battles2usermap] | None:
+        """
+        Recent match information
+        URL: https://data.ninjakiwi.com/battles2/users/:userID/matches
+        """
+        endpoint = f"battles2/users/{user_id}/matches"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Battles2usermap.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_users_by_user_id_homs(self, user_id: str) -> list[Battles2userhomrank] | None:
+        """
+        Recent hall of masters positions
+        URL: https://data.ninjakiwi.com/battles2/users/:userID/homs
+        """
+        endpoint = f"battles2/users/{user_id}/homs"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, list):
+            return None
+        try:
+            return [Battles2userhomrank.model_validate(item) for item in body]
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_guild_by_guild_id(self, guild_id: str) -> Battles2guild | None:
+        """
+        Information about a Battles 2 Guild/Clan
+        URL: https://data.ninjakiwi.com/battles2/guild/:guildID
+        """
+        endpoint = f"battles2/guild/{guild_id}"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Battles2guild.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+
+
+    async def get_battles2_guild_by_guild_id_war(self, guild_id: str) -> Battles2guildwar | None:
+        """
+        A list of recent wars the guild has taken part in
+        URL: https://data.ninjakiwi.com/battles2/guild/:guildID/war
+        """
+        endpoint = f"battles2/guild/{guild_id}/war"
+        body = await self._get_request(endpoint)
+        if not body or not isinstance(body, dict):
+            return None
+        try:
+            return Battles2guildwar.model_validate(body)
+        except ValidationError as e:
+            print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+            return None
+
+# --- Example Usage ---
+
+async def main():
+    """Example usage of the auto-generated NinjaKiwiAPI wrapper."""
+    api = NinjaKiwiAPI()
+    print("Welcome to the BTD6 API Wrapper Example!")
+    print("-" * 40)
+
+    try:
+        print("\nFetching BTD6 races...")
+        races = await api.get_btd6_races()
+
+        if races and len(races) > 0:
+            latest_race = races[0]
+            print(f"Successfully fetched {len(races)} races. Latest race: '{latest_race.name}' (ID: {latest_race.id})")
+
+            if latest_race.id:
+                print(f"\nFetching leaderboard for race: {latest_race.name}...")
+                leaderboard = await api.get_btd6_races_by_race_id_leaderboard(race_id=latest_race.id)
+                if leaderboard and len(leaderboard) > 0:
+                    top_player = leaderboard[0]
+                    print(f"Top player: {top_player.display_name} with score {top_player.score}")
+                else:
+                    print("Could not retrieve leaderboard or it is empty.")
+        else:
+            print("Failed to fetch BTD6 races or no races are available.")
+
+    finally:
+        print("\nClosing API client.")
+        await api.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+================================================
+FILE: pyproject.toml
+================================================
+[project]
+name = "bloons-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "lxml>=6.0.2",
+    "pydantic>=2.11.9",
+]
+
+[project.optional-dependencies]
+codegen = [
+    "lxml>=6.0.2",
+    "jinja2>=3.1.4",
+]
+
+
+================================================
+FILE: uv.lock
+================================================
+version = 1
+revision = 3
+requires-python = ">=3.13"
+
+[[package]]
+name = "annotated-types"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+]
+
+[[package]]
+name = "anyio"
+version = "4.11.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "idna" },
+    { name = "sniffio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
+]
+
+[[package]]
+name = "bloons-mcp"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "httpx" },
+    { name = "lxml" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "lxml", specifier = ">=6.0.2" },
+    { name = "pydantic", specifier = ">=2.11.9" },
+]
+
+[[package]]
+name = "certifi"
+version = "2025.8.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/67/960ebe6bf230a96cda2e0abcf73af550ec4f090005363542f0765df162e0/certifi-2025.8.3.tar.gz", hash = "sha256:e564105f78ded564e3ae7c923924435e1daa7463faeab5bb932bc53ffae63407", size = 162386, upload-time = "2025-08-03T03:07:47.08Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/48/1549795ba7742c948d2ad169c1c8cdbae65bc450d6cd753d124b17c8cd32/certifi-2025.8.3-py3-none-any.whl", hash = "sha256:f6c12493cfb1b06ba2ff328595af9350c65d6644968e5d3a2ffd78699af217a5", size = 161216, upload-time = "2025-08-03T03:07:45.777Z" },
+]
+
+[[package]]
+name = "h11"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517, upload-time = "2024-12-06T15:37:21.509Z" },
+]
+
+[[package]]
+name = "idna"
+version = "3.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490, upload-time = "2024-09-15T18:07:39.745Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442, upload-time = "2024-09-15T18:07:37.964Z" },
+]
+
+[[package]]
+name = "lxml"
+version = "6.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/88/262177de60548e5a2bfc46ad28232c9e9cbde697bd94132aeb80364675cb/lxml-6.0.2.tar.gz", hash = "sha256:cd79f3367bd74b317dda655dc8fcfa304d9eb6e4fb06b7168c5cf27f96e0cd62", size = 4073426, upload-time = "2025-09-22T04:04:59.287Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/53/fd/4e8f0540608977aea078bf6d79f128e0e2c2bba8af1acf775c30baa70460/lxml-6.0.2-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:9b33d21594afab46f37ae58dfadd06636f154923c4e8a4d754b0127554eb2e77", size = 8648494, upload-time = "2025-09-22T04:01:54.242Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/f4/2a94a3d3dfd6c6b433501b8d470a1960a20ecce93245cf2db1706adf6c19/lxml-6.0.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:6c8963287d7a4c5c9a432ff487c52e9c5618667179c18a204bdedb27310f022f", size = 4661146, upload-time = "2025-09-22T04:01:56.282Z" },
+    { url = "https://files.pythonhosted.org/packages/25/2e/4efa677fa6b322013035d38016f6ae859d06cac67437ca7dc708a6af7028/lxml-6.0.2-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1941354d92699fb5ffe6ed7b32f9649e43c2feb4b97205f75866f7d21aa91452", size = 4946932, upload-time = "2025-09-22T04:01:58.989Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/0f/526e78a6d38d109fdbaa5049c62e1d32fdd70c75fb61c4eadf3045d3d124/lxml-6.0.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:bb2f6ca0ae2d983ded09357b84af659c954722bbf04dea98030064996d156048", size = 5100060, upload-time = "2025-09-22T04:02:00.812Z" },
+    { url = "https://files.pythonhosted.org/packages/81/76/99de58d81fa702cc0ea7edae4f4640416c2062813a00ff24bd70ac1d9c9b/lxml-6.0.2-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:eb2a12d704f180a902d7fa778c6d71f36ceb7b0d317f34cdc76a5d05aa1dd1df", size = 5019000, upload-time = "2025-09-22T04:02:02.671Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/35/9e57d25482bc9a9882cb0037fdb9cc18f4b79d85df94fa9d2a89562f1d25/lxml-6.0.2-cp313-cp313-manylinux_2_26_i686.manylinux_2_28_i686.whl", hash = "sha256:6ec0e3f745021bfed19c456647f0298d60a24c9ff86d9d051f52b509663feeb1", size = 5348496, upload-time = "2025-09-22T04:02:04.904Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/8e/cb99bd0b83ccc3e8f0f528e9aa1f7a9965dfec08c617070c5db8d63a87ce/lxml-6.0.2-cp313-cp313-manylinux_2_26_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:846ae9a12d54e368933b9759052d6206a9e8b250291109c48e350c1f1f49d916", size = 5643779, upload-time = "2025-09-22T04:02:06.689Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/34/9e591954939276bb679b73773836c6684c22e56d05980e31d52a9a8deb18/lxml-6.0.2-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ef9266d2aa545d7374938fb5c484531ef5a2ec7f2d573e62f8ce722c735685fd", size = 5244072, upload-time = "2025-09-22T04:02:08.587Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/27/b29ff065f9aaca443ee377aff699714fcbffb371b4fce5ac4ca759e436d5/lxml-6.0.2-cp313-cp313-manylinux_2_31_armv7l.whl", hash = "sha256:4077b7c79f31755df33b795dc12119cb557a0106bfdab0d2c2d97bd3cf3dffa6", size = 4718675, upload-time = "2025-09-22T04:02:10.783Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/9f/f756f9c2cd27caa1a6ef8c32ae47aadea697f5c2c6d07b0dae133c244fbe/lxml-6.0.2-cp313-cp313-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:a7c5d5e5f1081955358533be077166ee97ed2571d6a66bdba6ec2f609a715d1a", size = 5255171, upload-time = "2025-09-22T04:02:12.631Z" },
+    { url = "https://files.pythonhosted.org/packages/61/46/bb85ea42d2cb1bd8395484fd72f38e3389611aa496ac7772da9205bbda0e/lxml-6.0.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:8f8d0cbd0674ee89863a523e6994ac25fd5be9c8486acfc3e5ccea679bad2679", size = 5057175, upload-time = "2025-09-22T04:02:14.718Z" },
+    { url = "https://files.pythonhosted.org/packages/95/0c/443fc476dcc8e41577f0af70458c50fe299a97bb6b7505bb1ae09aa7f9ac/lxml-6.0.2-cp313-cp313-musllinux_1_2_armv7l.whl", hash = "sha256:2cbcbf6d6e924c28f04a43f3b6f6e272312a090f269eff68a2982e13e5d57659", size = 4785688, upload-time = "2025-09-22T04:02:16.957Z" },
+    { url = "https://files.pythonhosted.org/packages/48/78/6ef0b359d45bb9697bc5a626e1992fa5d27aa3f8004b137b2314793b50a0/lxml-6.0.2-cp313-cp313-musllinux_1_2_ppc64le.whl", hash = "sha256:dfb874cfa53340009af6bdd7e54ebc0d21012a60a4e65d927c2e477112e63484", size = 5660655, upload-time = "2025-09-22T04:02:18.815Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/ea/e1d33808f386bc1339d08c0dcada6e4712d4ed8e93fcad5f057070b7988a/lxml-6.0.2-cp313-cp313-musllinux_1_2_riscv64.whl", hash = "sha256:fb8dae0b6b8b7f9e96c26fdd8121522ce5de9bb5538010870bd538683d30e9a2", size = 5247695, upload-time = "2025-09-22T04:02:20.593Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/47/eba75dfd8183673725255247a603b4ad606f4ae657b60c6c145b381697da/lxml-6.0.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:358d9adae670b63e95bc59747c72f4dc97c9ec58881d4627fe0120da0f90d314", size = 5269841, upload-time = "2025-09-22T04:02:22.489Z" },
+    { url = "https://files.pythonhosted.org/packages/76/04/5c5e2b8577bc936e219becb2e98cdb1aca14a4921a12995b9d0c523502ae/lxml-6.0.2-cp313-cp313-win32.whl", hash = "sha256:e8cd2415f372e7e5a789d743d133ae474290a90b9023197fd78f32e2dc6873e2", size = 3610700, upload-time = "2025-09-22T04:02:24.465Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/0a/4643ccc6bb8b143e9f9640aa54e38255f9d3b45feb2cbe7ae2ca47e8782e/lxml-6.0.2-cp313-cp313-win_amd64.whl", hash = "sha256:b30d46379644fbfc3ab81f8f82ae4de55179414651f110a1514f0b1f8f6cb2d7", size = 4010347, upload-time = "2025-09-22T04:02:26.286Z" },
+    { url = "https://files.pythonhosted.org/packages/31/ef/dcf1d29c3f530577f61e5fe2f1bd72929acf779953668a8a47a479ae6f26/lxml-6.0.2-cp313-cp313-win_arm64.whl", hash = "sha256:13dcecc9946dca97b11b7c40d29fba63b55ab4170d3c0cf8c0c164343b9bfdcf", size = 3671248, upload-time = "2025-09-22T04:02:27.918Z" },
+    { url = "https://files.pythonhosted.org/packages/03/15/d4a377b385ab693ce97b472fe0c77c2b16ec79590e688b3ccc71fba19884/lxml-6.0.2-cp314-cp314-macosx_10_13_universal2.whl", hash = "sha256:b0c732aa23de8f8aec23f4b580d1e52905ef468afb4abeafd3fec77042abb6fe", size = 8659801, upload-time = "2025-09-22T04:02:30.113Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/e8/c128e37589463668794d503afaeb003987373c5f94d667124ffd8078bbd9/lxml-6.0.2-cp314-cp314-macosx_10_13_x86_64.whl", hash = "sha256:4468e3b83e10e0317a89a33d28f7aeba1caa4d1a6fd457d115dd4ffe90c5931d", size = 4659403, upload-time = "2025-09-22T04:02:32.119Z" },
+    { url = "https://files.pythonhosted.org/packages/00/ce/74903904339decdf7da7847bb5741fc98a5451b42fc419a86c0c13d26fe2/lxml-6.0.2-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:abd44571493973bad4598a3be7e1d807ed45aa2adaf7ab92ab7c62609569b17d", size = 4966974, upload-time = "2025-09-22T04:02:34.155Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/d3/131dec79ce61c5567fecf82515bd9bc36395df42501b50f7f7f3bd065df0/lxml-6.0.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:370cd78d5855cfbffd57c422851f7d3864e6ae72d0da615fca4dad8c45d375a5", size = 5102953, upload-time = "2025-09-22T04:02:36.054Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/ea/a43ba9bb750d4ffdd885f2cd333572f5bb900cd2408b67fdda07e85978a0/lxml-6.0.2-cp314-cp314-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:901e3b4219fa04ef766885fb40fa516a71662a4c61b80c94d25336b4934b71c0", size = 5055054, upload-time = "2025-09-22T04:02:38.154Z" },
+    { url = "https://files.pythonhosted.org/packages/60/23/6885b451636ae286c34628f70a7ed1fcc759f8d9ad382d132e1c8d3d9bfd/lxml-6.0.2-cp314-cp314-manylinux_2_26_i686.manylinux_2_28_i686.whl", hash = "sha256:a4bf42d2e4cf52c28cc1812d62426b9503cdb0c87a6de81442626aa7d69707ba", size = 5352421, upload-time = "2025-09-22T04:02:40.413Z" },
+    { url = "https://files.pythonhosted.org/packages/48/5b/fc2ddfc94ddbe3eebb8e9af6e3fd65e2feba4967f6a4e9683875c394c2d8/lxml-6.0.2-cp314-cp314-manylinux_2_26_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:b2c7fdaa4d7c3d886a42534adec7cfac73860b89b4e5298752f60aa5984641a0", size = 5673684, upload-time = "2025-09-22T04:02:42.288Z" },
+    { url = "https://files.pythonhosted.org/packages/29/9c/47293c58cc91769130fbf85531280e8cc7868f7fbb6d92f4670071b9cb3e/lxml-6.0.2-cp314-cp314-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:98a5e1660dc7de2200b00d53fa00bcd3c35a3608c305d45a7bbcaf29fa16e83d", size = 5252463, upload-time = "2025-09-22T04:02:44.165Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/da/ba6eceb830c762b48e711ded880d7e3e89fc6c7323e587c36540b6b23c6b/lxml-6.0.2-cp314-cp314-manylinux_2_31_armv7l.whl", hash = "sha256:dc051506c30b609238d79eda75ee9cab3e520570ec8219844a72a46020901e37", size = 4698437, upload-time = "2025-09-22T04:02:46.524Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/24/7be3f82cb7990b89118d944b619e53c656c97dc89c28cfb143fdb7cd6f4d/lxml-6.0.2-cp314-cp314-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:8799481bbdd212470d17513a54d568f44416db01250f49449647b5ab5b5dccb9", size = 5269890, upload-time = "2025-09-22T04:02:48.812Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/bd/dcfb9ea1e16c665efd7538fc5d5c34071276ce9220e234217682e7d2c4a5/lxml-6.0.2-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:9261bb77c2dab42f3ecd9103951aeca2c40277701eb7e912c545c1b16e0e4917", size = 5097185, upload-time = "2025-09-22T04:02:50.746Z" },
+    { url = "https://files.pythonhosted.org/packages/21/04/a60b0ff9314736316f28316b694bccbbabe100f8483ad83852d77fc7468e/lxml-6.0.2-cp314-cp314-musllinux_1_2_armv7l.whl", hash = "sha256:65ac4a01aba353cfa6d5725b95d7aed6356ddc0a3cd734de00124d285b04b64f", size = 4745895, upload-time = "2025-09-22T04:02:52.968Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/bd/7d54bd1846e5a310d9c715921c5faa71cf5c0853372adf78aee70c8d7aa2/lxml-6.0.2-cp314-cp314-musllinux_1_2_ppc64le.whl", hash = "sha256:b22a07cbb82fea98f8a2fd814f3d1811ff9ed76d0fc6abc84eb21527596e7cc8", size = 5695246, upload-time = "2025-09-22T04:02:54.798Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/32/5643d6ab947bc371da21323acb2a6e603cedbe71cb4c99c8254289ab6f4e/lxml-6.0.2-cp314-cp314-musllinux_1_2_riscv64.whl", hash = "sha256:d759cdd7f3e055d6bc8d9bec3ad905227b2e4c785dc16c372eb5b5e83123f48a", size = 5260797, upload-time = "2025-09-22T04:02:57.058Z" },
+    { url = "https://files.pythonhosted.org/packages/33/da/34c1ec4cff1eea7d0b4cd44af8411806ed943141804ac9c5d565302afb78/lxml-6.0.2-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:945da35a48d193d27c188037a05fec5492937f66fb1958c24fc761fb9d40d43c", size = 5277404, upload-time = "2025-09-22T04:02:58.966Z" },
+    { url = "https://files.pythonhosted.org/packages/82/57/4eca3e31e54dc89e2c3507e1cd411074a17565fa5ffc437c4ae0a00d439e/lxml-6.0.2-cp314-cp314-win32.whl", hash = "sha256:be3aaa60da67e6153eb15715cc2e19091af5dc75faef8b8a585aea372507384b", size = 3670072, upload-time = "2025-09-22T04:03:38.05Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/e0/c96cf13eccd20c9421ba910304dae0f619724dcf1702864fd59dd386404d/lxml-6.0.2-cp314-cp314-win_amd64.whl", hash = "sha256:fa25afbadead523f7001caf0c2382afd272c315a033a7b06336da2637d92d6ed", size = 4080617, upload-time = "2025-09-22T04:03:39.835Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/5d/b3f03e22b3d38d6f188ef044900a9b29b2fe0aebb94625ce9fe244011d34/lxml-6.0.2-cp314-cp314-win_arm64.whl", hash = "sha256:063eccf89df5b24e361b123e257e437f9e9878f425ee9aae3144c77faf6da6d8", size = 3754930, upload-time = "2025-09-22T04:03:41.565Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/5c/42c2c4c03554580708fc738d13414801f340c04c3eff90d8d2d227145275/lxml-6.0.2-cp314-cp314t-macosx_10_13_universal2.whl", hash = "sha256:6162a86d86893d63084faaf4ff937b3daea233e3682fb4474db07395794fa80d", size = 8910380, upload-time = "2025-09-22T04:03:01.645Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/4f/12df843e3e10d18d468a7557058f8d3733e8b6e12401f30b1ef29360740f/lxml-6.0.2-cp314-cp314t-macosx_10_13_x86_64.whl", hash = "sha256:414aaa94e974e23a3e92e7ca5b97d10c0cf37b6481f50911032c69eeb3991bba", size = 4775632, upload-time = "2025-09-22T04:03:03.814Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/0c/9dc31e6c2d0d418483cbcb469d1f5a582a1cd00a1f4081953d44051f3c50/lxml-6.0.2-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:48461bd21625458dd01e14e2c38dd0aea69addc3c4f960c30d9f59d7f93be601", size = 4975171, upload-time = "2025-09-22T04:03:05.651Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/2b/9b870c6ca24c841bdd887504808f0417aa9d8d564114689266f19ddf29c8/lxml-6.0.2-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:25fcc59afc57d527cfc78a58f40ab4c9b8fd096a9a3f964d2781ffb6eb33f4ed", size = 5110109, upload-time = "2025-09-22T04:03:07.452Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/0c/4f5f2a4dd319a178912751564471355d9019e220c20d7db3fb8307ed8582/lxml-6.0.2-cp314-cp314t-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:5179c60288204e6ddde3f774a93350177e08876eaf3ab78aa3a3649d43eb7d37", size = 5041061, upload-time = "2025-09-22T04:03:09.297Z" },
+    { url = "https://files.pythonhosted.org/packages/12/64/554eed290365267671fe001a20d72d14f468ae4e6acef1e179b039436967/lxml-6.0.2-cp314-cp314t-manylinux_2_26_i686.manylinux_2_28_i686.whl", hash = "sha256:967aab75434de148ec80597b75062d8123cadf2943fb4281f385141e18b21338", size = 5306233, upload-time = "2025-09-22T04:03:11.651Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/31/1d748aa275e71802ad9722df32a7a35034246b42c0ecdd8235412c3396ef/lxml-6.0.2-cp314-cp314t-manylinux_2_26_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:d100fcc8930d697c6561156c6810ab4a508fb264c8b6779e6e61e2ed5e7558f9", size = 5604739, upload-time = "2025-09-22T04:03:13.592Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/41/2c11916bcac09ed561adccacceaedd2bf0e0b25b297ea92aab99fd03d0fa/lxml-6.0.2-cp314-cp314t-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2ca59e7e13e5981175b8b3e4ab84d7da57993eeff53c07764dcebda0d0e64ecd", size = 5225119, upload-time = "2025-09-22T04:03:15.408Z" },
+    { url = "https://files.pythonhosted.org/packages/99/05/4e5c2873d8f17aa018e6afde417c80cc5d0c33be4854cce3ef5670c49367/lxml-6.0.2-cp314-cp314t-manylinux_2_31_armv7l.whl", hash = "sha256:957448ac63a42e2e49531b9d6c0fa449a1970dbc32467aaad46f11545be9af1d", size = 4633665, upload-time = "2025-09-22T04:03:17.262Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/c9/dcc2da1bebd6275cdc723b515f93edf548b82f36a5458cca3578bc899332/lxml-6.0.2-cp314-cp314t-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:b7fc49c37f1786284b12af63152fe1d0990722497e2d5817acfe7a877522f9a9", size = 5234997, upload-time = "2025-09-22T04:03:19.14Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/e2/5172e4e7468afca64a37b81dba152fc5d90e30f9c83c7c3213d6a02a5ce4/lxml-6.0.2-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:e19e0643cc936a22e837f79d01a550678da8377d7d801a14487c10c34ee49c7e", size = 5090957, upload-time = "2025-09-22T04:03:21.436Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/b3/15461fd3e5cd4ddcb7938b87fc20b14ab113b92312fc97afe65cd7c85de1/lxml-6.0.2-cp314-cp314t-musllinux_1_2_armv7l.whl", hash = "sha256:1db01e5cf14345628e0cbe71067204db658e2fb8e51e7f33631f5f4735fefd8d", size = 4764372, upload-time = "2025-09-22T04:03:23.27Z" },
+    { url = "https://files.pythonhosted.org/packages/05/33/f310b987c8bf9e61c4dd8e8035c416bd3230098f5e3cfa69fc4232de7059/lxml-6.0.2-cp314-cp314t-musllinux_1_2_ppc64le.whl", hash = "sha256:875c6b5ab39ad5291588aed6925fac99d0097af0dd62f33c7b43736043d4a2ec", size = 5634653, upload-time = "2025-09-22T04:03:25.767Z" },
+    { url = "https://files.pythonhosted.org/packages/70/ff/51c80e75e0bc9382158133bdcf4e339b5886c6ee2418b5199b3f1a61ed6d/lxml-6.0.2-cp314-cp314t-musllinux_1_2_riscv64.whl", hash = "sha256:cdcbed9ad19da81c480dfd6dd161886db6096083c9938ead313d94b30aadf272", size = 5233795, upload-time = "2025-09-22T04:03:27.62Z" },
+    { url = "https://files.pythonhosted.org/packages/56/4d/4856e897df0d588789dd844dbed9d91782c4ef0b327f96ce53c807e13128/lxml-6.0.2-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:80dadc234ebc532e09be1975ff538d154a7fa61ea5031c03d25178855544728f", size = 5257023, upload-time = "2025-09-22T04:03:30.056Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/85/86766dfebfa87bea0ab78e9ff7a4b4b45225df4b4d3b8cc3c03c5cd68464/lxml-6.0.2-cp314-cp314t-win32.whl", hash = "sha256:da08e7bb297b04e893d91087df19638dc7a6bb858a954b0cc2b9f5053c922312", size = 3911420, upload-time = "2025-09-22T04:03:32.198Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/1a/b248b355834c8e32614650b8008c69ffeb0ceb149c793961dd8c0b991bb3/lxml-6.0.2-cp314-cp314t-win_amd64.whl", hash = "sha256:252a22982dca42f6155125ac76d3432e548a7625d56f5a273ee78a5057216eca", size = 4406837, upload-time = "2025-09-22T04:03:34.027Z" },
+    { url = "https://files.pythonhosted.org/packages/92/aa/df863bcc39c5e0946263454aba394de8a9084dbaff8ad143846b0d844739/lxml-6.0.2-cp314-cp314t-win_arm64.whl", hash = "sha256:bb4c1847b303835d89d785a18801a883436cdfd5dc3d62947f9c49e24f0f5a2c", size = 3822205, upload-time = "2025-09-22T04:03:36.249Z" },
+]
+
+[[package]]
+name = "pydantic"
+version = "2.11.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "annotated-types" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/5d/09a551ba512d7ca404d785072700d3f6727a02f6f3c24ecfd081c7cf0aa8/pydantic-2.11.9.tar.gz", hash = "sha256:6b8ffda597a14812a7975c90b82a8a2e777d9257aba3453f973acd3c032a18e2", size = 788495, upload-time = "2025-09-13T11:26:39.325Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/d3/108f2006987c58e76691d5ae5d200dd3e0f532cb4e5fa3560751c3a1feba/pydantic-2.11.9-py3-none-any.whl", hash = "sha256:c42dd626f5cfc1c6950ce6205ea58c93efa406da65f479dcb4029d5934857da2", size = 444855, upload-time = "2025-09-13T11:26:36.909Z" },
+]
+
+[[package]]
+name = "pydantic-core"
+version = "2.33.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ad/88/5f2260bdfae97aabf98f1778d43f69574390ad787afb646292a638c923d4/pydantic_core-2.33.2.tar.gz", hash = "sha256:7cb8bc3605c29176e1b105350d2e6474142d7c1bd1d9327c4a9bdb46bf827acc", size = 435195, upload-time = "2025-04-23T18:33:52.104Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/8c/99040727b41f56616573a28771b1bfa08a3d3fe74d3d513f01251f79f172/pydantic_core-2.33.2-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:1082dd3e2d7109ad8b7da48e1d4710c8d06c253cbc4a27c1cff4fbcaa97a9e3f", size = 2015688, upload-time = "2025-04-23T18:31:53.175Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/cc/5999d1eb705a6cefc31f0b4a90e9f7fc400539b1a1030529700cc1b51838/pydantic_core-2.33.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:f517ca031dfc037a9c07e748cefd8d96235088b83b4f4ba8939105d20fa1dcd6", size = 1844808, upload-time = "2025-04-23T18:31:54.79Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/5e/a0a7b8885c98889a18b6e376f344da1ef323d270b44edf8174d6bce4d622/pydantic_core-2.33.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0a9f2c9dd19656823cb8250b0724ee9c60a82f3cdf68a080979d13092a3b0fef", size = 1885580, upload-time = "2025-04-23T18:31:57.393Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/2a/953581f343c7d11a304581156618c3f592435523dd9d79865903272c256a/pydantic_core-2.33.2-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:2b0a451c263b01acebe51895bfb0e1cc842a5c666efe06cdf13846c7418caa9a", size = 1973859, upload-time = "2025-04-23T18:31:59.065Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/55/f1a813904771c03a3f97f676c62cca0c0a4138654107c1b61f19c644868b/pydantic_core-2.33.2-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:1ea40a64d23faa25e62a70ad163571c0b342b8bf66d5fa612ac0dec4f069d916", size = 2120810, upload-time = "2025-04-23T18:32:00.78Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/c3/053389835a996e18853ba107a63caae0b9deb4a276c6b472931ea9ae6e48/pydantic_core-2.33.2-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:0fb2d542b4d66f9470e8065c5469ec676978d625a8b7a363f07d9a501a9cb36a", size = 2676498, upload-time = "2025-04-23T18:32:02.418Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/3c/f4abd740877a35abade05e437245b192f9d0ffb48bbbbd708df33d3cda37/pydantic_core-2.33.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9fdac5d6ffa1b5a83bca06ffe7583f5576555e6c8b3a91fbd25ea7780f825f7d", size = 2000611, upload-time = "2025-04-23T18:32:04.152Z" },
+    { url = "https://files.pythonhosted.org/packages/59/a7/63ef2fed1837d1121a894d0ce88439fe3e3b3e48c7543b2a4479eb99c2bd/pydantic_core-2.33.2-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:04a1a413977ab517154eebb2d326da71638271477d6ad87a769102f7c2488c56", size = 2107924, upload-time = "2025-04-23T18:32:06.129Z" },
+    { url = "https://files.pythonhosted.org/packages/04/8f/2551964ef045669801675f1cfc3b0d74147f4901c3ffa42be2ddb1f0efc4/pydantic_core-2.33.2-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:c8e7af2f4e0194c22b5b37205bfb293d166a7344a5b0d0eaccebc376546d77d5", size = 2063196, upload-time = "2025-04-23T18:32:08.178Z" },
+    { url = "https://files.pythonhosted.org/packages/26/bd/d9602777e77fc6dbb0c7db9ad356e9a985825547dce5ad1d30ee04903918/pydantic_core-2.33.2-cp313-cp313-musllinux_1_1_armv7l.whl", hash = "sha256:5c92edd15cd58b3c2d34873597a1e20f13094f59cf88068adb18947df5455b4e", size = 2236389, upload-time = "2025-04-23T18:32:10.242Z" },
+    { url = "https://files.pythonhosted.org/packages/42/db/0e950daa7e2230423ab342ae918a794964b053bec24ba8af013fc7c94846/pydantic_core-2.33.2-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:65132b7b4a1c0beded5e057324b7e16e10910c106d43675d9bd87d4f38dde162", size = 2239223, upload-time = "2025-04-23T18:32:12.382Z" },
+    { url = "https://files.pythonhosted.org/packages/58/4d/4f937099c545a8a17eb52cb67fe0447fd9a373b348ccfa9a87f141eeb00f/pydantic_core-2.33.2-cp313-cp313-win32.whl", hash = "sha256:52fb90784e0a242bb96ec53f42196a17278855b0f31ac7c3cc6f5c1ec4811849", size = 1900473, upload-time = "2025-04-23T18:32:14.034Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/75/4a0a9bac998d78d889def5e4ef2b065acba8cae8c93696906c3a91f310ca/pydantic_core-2.33.2-cp313-cp313-win_amd64.whl", hash = "sha256:c083a3bdd5a93dfe480f1125926afcdbf2917ae714bdb80b36d34318b2bec5d9", size = 1955269, upload-time = "2025-04-23T18:32:15.783Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/86/1beda0576969592f1497b4ce8e7bc8cbdf614c352426271b1b10d5f0aa64/pydantic_core-2.33.2-cp313-cp313-win_arm64.whl", hash = "sha256:e80b087132752f6b3d714f041ccf74403799d3b23a72722ea2e6ba2e892555b9", size = 1893921, upload-time = "2025-04-23T18:32:18.473Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/7d/e09391c2eebeab681df2b74bfe6c43422fffede8dc74187b2b0bf6fd7571/pydantic_core-2.33.2-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:61c18fba8e5e9db3ab908620af374db0ac1baa69f0f32df4f61ae23f15e586ac", size = 1806162, upload-time = "2025-04-23T18:32:20.188Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/3d/847b6b1fed9f8ed3bb95a9ad04fbd0b212e832d4f0f50ff4d9ee5a9f15cf/pydantic_core-2.33.2-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:95237e53bb015f67b63c91af7518a62a8660376a6a0db19b89acc77a4d6199f5", size = 1981560, upload-time = "2025-04-23T18:32:22.354Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/9a/e73262f6c6656262b5fdd723ad90f518f579b7bc8622e43a942eec53c938/pydantic_core-2.33.2-cp313-cp313t-win_amd64.whl", hash = "sha256:c2fc0a768ef76c15ab9238afa6da7f69895bb5d1ee83aeea2e3509af4472d0b9", size = 1935777, upload-time = "2025-04-23T18:32:25.088Z" },
+]
+
+[[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
+]
+
+[[package]]
+name = "typing-inspection"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/b1/0c11f5058406b3af7609f121aaa6b609744687f1d158b3c3a5bf4cc94238/typing_inspection-0.4.1.tar.gz", hash = "sha256:6ae134cc0203c33377d43188d4064e9b357dba58cff3185f22924610e70a9d28", size = 75726, upload-time = "2025-05-21T18:55:23.885Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/69/cd203477f944c353c31bade965f880aa1061fd6bf05ded0726ca845b6ff7/typing_inspection-0.4.1-py3-none-any.whl", hash = "sha256:389055682238f53b04f7badcb49b989835495a96700ced5dab2d8feae4b26f51", size = 14552, upload-time = "2025-05-21T18:55:22.152Z" },
+]
+
+
+
+================================================
+FILE: .python-version
+================================================
+3.13
+
+
+
+================================================
+FILE: codegen/__init__.py
+================================================
+[Empty file]
+
+
+================================================
+FILE: codegen/gen.py
+================================================
+import asyncio
+import re
+import textwrap
+
+import httpx
+from jinja2 import Environment, FileSystemLoader
+from lxml import html
+
+
+def to_snake_case(name: str) -> str:
+    """Converts a string from camelCase to snake_case."""
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+def to_pascal_case(name: str) -> str:
+    """Converts a string like '_btd6_race' to 'Btd6Race'."""
+    name = name.lstrip('_')
+    name = name.replace('btd6', 'Btd6').replace('battles2', 'Battles2')
+    return "".join(part.capitalize() for part in re.split('_|-', name))
+
+
+def map_type_hint(type_str: str) -> str:
+    """Maps the documentation type string to a Python type hint."""
+    type_str = type_str.strip().lower()
+    if not type_str:
+        return "Any"
+
+    if ',' in type_str:
+        literals = [f"'{val.strip()}'" for val in type_str.split(',')]
+        return f"Literal[{', '.join(literals)}]"
+
+    type_map = {
+        "string": "str", "number": "int | float", "boolean": "bool",
+        "array": "list", "string[]": "list[str]", "map": "dict[str, Any]",
+        "nestedmap": "dict[str, Any]", "asseturl": "str", "raw": "dict[str, Any]",
+    }
+    return type_map.get(type_str, "Any")
+
+
+def generate_pydantic_models(tree: html.HtmlElement) -> str:
+    """Parses HTML and generates complete Pydantic model class strings."""
+    model_definitions = []
+    processed_models = set()
+    model_title_elements = tree.xpath('//div[contains(text(), "Response Model:")]')
+
+    for title_elem in model_title_elements:
+        model_name_raw = title_elem.text_content().replace("Response Model:", "").strip()
+        if model_name_raw in processed_models:
+            continue
+        processed_models.add(model_name_raw)
+        
+        class_name = to_pascal_case(model_name_raw)
+        fields_data = []
+        
+        param_container = title_elem.xpath('./following-sibling::div[contains(@class, "container-fluid")][1]')
+        if not param_container:
+            continue
+
+        field_rows = param_container[0].xpath('.//div[@class="row nkEndpointSectionParameter"]')
+        for row in field_rows:
+            cols = row.xpath('./div')
+            if len(cols) > 2:
+                raw_field_name = cols[0].text_content().strip()
+                
+                python_field_name = to_snake_case(raw_field_name.lstrip('_'))
+                if raw_field_name.startswith('_'):
+                    python_field_name += '_data'
+
+                field_desc = " ".join(cols[1].text_content().strip().split())
+                py_type = map_type_hint(cols[2].text_content().strip())
+                
+                fields_data.append({
+                    "name": python_field_name,
+                    "type_hint": py_type,
+                    "alias": raw_field_name,
+                    "description": field_desc or "No description available."
+                })
+        
+        field_strings = []
+        for field in fields_data:
+            field_def = f"{field['name']}: {field['type_hint']} | None = Field(default=None, alias='{field['alias']}')"
+            docstring = f'"""{field["description"]}"""'
+            field_strings.append(f"{field_def}\n    {docstring}")
+
+        all_fields_str = "\n\n    ".join(field_strings) if field_strings else "pass"
+        
+        model_code = f"""class {class_name}(BaseModel):
+    \"\"\"Pydantic model for {model_name_raw}\"\"\"
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    {all_fields_str}
+"""
+        model_definitions.append(model_code)
+
+    return "\n\n".join(model_definitions)
+
+def parse_api_methods(tree: html.HtmlElement) -> list[dict]:
+    """Parses the HTML to extract data for API client methods."""
+    methods_data = []
+    endpoints = tree.xpath('//div[contains(@class, "nkLeftMenu")]//a[contains(@class, "nkAnchor")]')
+
+    for endpoint in endpoints:
+        path = endpoint.xpath('.//div[contains(@class, "nkLeftMenuItemTitle")]/text()')[0].strip()
+        description = endpoint.xpath('.//div[contains(@class, "nkLeftMenuItemBody")]/text()')[0].strip()
+        
+        endpoint_section = tree.xpath(f'//div[@id="{path}"]/following-sibling::div[1]')
+        
+        model_name, return_model, is_list = "Any", "Any | None", False
+        
+        if endpoint_section:
+            model_title_elem = endpoint_section[0].xpath('.//div[contains(text(), "Response Model:")]')
+            if model_title_elem:
+                model_name_raw = model_title_elem[0].text_content().replace("Response Model:", "").strip()
+                model_name = to_pascal_case(model_name_raw)
+                
+                list_triggers = ["leaderboard", "filter", "matches", "homs"]
+                if (":" not in path) or any(trigger in path for trigger in list_triggers) or path.endswith("/maps"):
+                    is_list = True
+                    return_model = f"list[{model_name}] | None"
+                else:
+                    return_model = f"{model_name} | None"
+
+        params = [to_snake_case(p) for p in re.findall(r':(\w+)', path)]
+        
+        clean_path = path.replace("/", " ").replace(":", " by ").strip()
+        clean_path = re.sub(r'\s+', '_', clean_path)
+        function_name = to_snake_case(f"get_{clean_path}")
+        
+        endpoint_fstring = path.strip('/')
+        for param in re.findall(r':(\w+)', path):
+                endpoint_fstring = endpoint_fstring.replace(f":{param}", f"{{{to_snake_case(param)}}}")
+        
+        methods_data.append({
+            "name": function_name,
+            "description": description,
+            "url": path,
+            "params": params,
+            "endpoint_fstring": endpoint_fstring,
+            "return_type": return_model,
+            "model_name": model_name,
+            "is_list": is_list,
+        })
+    return methods_data
+
+def generate_main_block_context(methods_data: list[dict]) -> dict:
+    """Creates context for the example `main` function."""
+    try:
+        races_func = next(m for m in methods_data if m['name'] == 'get_btd6_races')
+        leaderboard_func = next(m for m in methods_data if m['name'] == 'get_btd6_races_by_race_id_leaderboard')
+        return {
+            "races_func_name": races_func['name'],
+            "leaderboard_func_name": leaderboard_func['name']
+        }
+    except StopIteration:
+        return {}
+
+async def run_generator():
+    """Fetches the API docs and generates the wrapper script using templates."""
+    url = "https://data.ninjakiwi.com/"
+    output_filename = 'btd6_api_wrapper.py'
+    
+    print("--- API Wrapper Generator Script ---")
+    
+    print(f"1. Fetching latest API documentation from {url}...")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            html_input = response.text
+    except httpx.RequestError as e:
+        print(f"\nError: Could not fetch the documentation page. Details: {e}")
+        return
+    except Exception as e:
+        print(f"\nAn unexpected error occurred during fetch: {e}")
+        return
+
+    print("2. Parsing HTML and generating code...")
+    tree = html.fromstring(html_input)
+    
+    rendered_models = generate_pydantic_models(tree)
+    
+    methods_data = parse_api_methods(tree)
+    main_context = generate_main_block_context(methods_data)
+
+    print("3. Rendering final API wrapper from templates...")
+    env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)
+    
+    rendered_methods = "\n\n".join([textwrap.indent(env.get_template("api_method.py.j2").render(method=m), ' ' * 4) for m in methods_data])
+    rendered_main = env.get_template("main_block.py.j2").render(**main_context)
+
+    final_code = env.get_template("wrapper.py.j2").render(
+        pydantic_models=rendered_models,
+        methods=rendered_methods,
+        main_block=rendered_main
+    )
+    
+    print(f"4. Writing wrapper to '{output_filename}'...")
+    with open(output_filename, 'w', encoding='utf-8') as f_out:
+        f_out.write(final_code)
+    
+    print(f"\nSuccessfully generated '{output_filename}'.")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_generator())
+
+
+================================================
+FILE: codegen/templates/api_method.py.j2
+================================================
+
+async def {{ method.name }}(self{%- if method.params %}, {% for p in method.params %}{{ p }}: str{% if not loop.last %}, {% endif %}{% endfor %}{%- endif %}) -> {{ method.return_type }}:
+    """
+    {{ method.description }}
+    URL: https://data.ninjakiwi.com{{ method.url }}
+    """
+    endpoint = f"{{ method.endpoint_fstring }}"
+    body = await self._get_request(endpoint)
+{% if method.model_name == 'Any' %}
+    return body
+{% elif method.is_list %}
+    if not body or not isinstance(body, list):
+        return None
+    try:
+        return [{{ method.model_name }}.model_validate(item) for item in body]
+    except ValidationError as e:
+        print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+        return None
+{% else %}
+    if not body or not isinstance(body, dict):
+        return None
+    try:
+        return {{ method.model_name }}.model_validate(body)
+    except ValidationError as e:
+        print(f"Pydantic validation error for endpoint '{endpoint}': {e}")
+        return None
+{% endif %}
+
+
+
+================================================
+FILE: codegen/templates/main_block.py.j2
+================================================
+
+async def main():
+    """Example usage of the auto-generated NinjaKiwiAPI wrapper."""
+    api = NinjaKiwiAPI()
+    print("Welcome to the BTD6 API Wrapper Example!")
+    print("-" * 40)
+
+    try:
+        print("\nFetching BTD6 races...")
+        races = await api.{{ races_func_name }}()
+
+        if races and len(races) > 0:
+            latest_race = races[0]
+            print(f"Successfully fetched {len(races)} races. Latest race: '{latest_race.name}' (ID: {latest_race.id})")
+
+            if latest_race.id:
+                print(f"\nFetching leaderboard for race: {latest_race.name}...")
+                leaderboard = await api.{{ leaderboard_func_name }}(race_id=latest_race.id)
+                if leaderboard and len(leaderboard) > 0:
+                    top_player = leaderboard[0]
+                    print(f"Top player: {top_player.display_name} with score {top_player.score}")
+                else:
+                    print("Could not retrieve leaderboard or it is empty.")
+        else:
+            print("Failed to fetch BTD6 races or no races are available.")
+
+    finally:
+        print("\nClosing API client.")
+        await api.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+================================================
+FILE: codegen/templates/pydantic_model.py.j2
+================================================
+
+class {{ model.class_name }}(BaseModel):
+    """Pydantic model for {{ model.raw_name }}"""
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+{% for field in model.fields %}
+    {{ field.name }}: {{ field.type_hint }} | None = Field(default=None, alias='{{ field.alias }}')
+    """{{ field.description }}"""
+
+{%- endfor %}
+
+
+
+================================================
+FILE: codegen/templates/wrapper.py.j2
+================================================
+
+import asyncio
+import json
+from typing import Any
+
+import httpx
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+# --- Pydantic Response Models ---
+{{ pydantic_models }}
+
+# --- API Client Class ---
+class NinjaKiwiAPI:
+    """
+    An asynchronous Python wrapper for the Bloons TD 6 and Battles 2 Data API.
+    This wrapper was auto-generated from the API documentation.
+    """
+    def __init__(self, base_url="https://data.ninjakiwi.com"):
+        self.client = httpx.AsyncClient(base_url=base_url, follow_redirects=True)
+
+    async def _get_request(self, endpoint: str) -> Any | None:
+        """Internal method to handle GET requests."""
+        try:
+            response = await self.client.get(endpoint)
+            response.raise_for_status()
+            data = response.json()
+            if data and data.get('error'):
+                print(f"API Error for {endpoint}: {data['error']}")
+                return None
+            return data.get('body')
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP Error for endpoint '{endpoint}': {e}")
+            return None
+        except (httpx.RequestError, json.JSONDecodeError) as e:
+            print(f"An error occurred with endpoint '{endpoint}': {e}")
+            return None
+
+    async def close(self):
+        """Closes the httpx client."""
+        await self.client.aclose()
+
+{% for method in methods %}
+{{- method -}}
+{% endfor %}
+
+# --- Example Usage ---
+{{ main_block }}
+
+
