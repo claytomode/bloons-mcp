@@ -1,0 +1,56 @@
+from contextlib import asynccontextmanager
+from fastmcp import FastMCP
+import fastmcp.server.context
+
+# --- Lifespan for Client Management ---
+
+@asynccontextmanager
+async def lifespan(mcp: FastMCP):
+    """
+    Handles the lifecycle of the NinjaKiwiAPI client.
+    It's created on server startup and closed on shutdown.
+    """
+    client = {{ client_class_name }}()
+    mcp.api_client = client
+    try:
+        yield
+    finally:
+        await mcp.api_client.close()
+
+mcp = FastMCP(
+    name="bloons-api",
+    instructions="An MCP server for the Ninja Kiwi Data API, powered by a generated client.",
+    lifespan=lifespan,
+)
+
+
+# --- Tool Registration ---
+
+print("\n--- Registering Tools ---")
+
+{% for method in methods %}
+# Tool wrapper for {{ client_class_name }}.{{ method.name }}
+@mcp.tool
+async def {{ method.name }}(
+    context: fastmcp.server.context.Context,
+    {%- for p in method.params %}
+    {{ p }}: str,
+    {%- endfor %}
+) -> {{ method.return_type }}:
+    """
+    {{ method.description }}
+    URL: {{ method.url }}
+    """
+    api_client: {{ client_class_name }} = context.fastmcp.api_client
+    return await api_client.{{ method.name }}(
+        {%- for p in method.params -%}
+        {{ p }}={{ p }}{{ "," if not loop.last }}
+        {%- endfor -%}
+    )
+
+{% endfor %}
+
+
+if __name__ == "__main__":
+    print("\nStarting FastMCP server...")
+    mcp.run()
