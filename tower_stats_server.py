@@ -305,8 +305,8 @@ class TowerDataStore:
 
 
 # --- FastMCP Server Setup ---
-data_file = "/home/runner/work/bloons-mcp/bloons-mcp/btd6_data.json"
-tower_data = TowerDataStore(data_file)
+data_file = Path(__file__).parent / "btd6_data.json"
+tower_data = TowerDataStore(str(data_file))
 
 mcp = FastMCP(
     name="btd6-tower-stats",

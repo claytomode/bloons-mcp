@@ -15,7 +15,7 @@ def demo_tower_data():
     print("🎮 BTD6 Tower Stats MCP Server Demo\n")
     
     # Load the generated data
-    data_file = "/home/runner/work/bloons-mcp/bloons-mcp/btd6_data.json"
+    data_file = Path(__file__).parent / "btd6_data.json"
     
     if not Path(data_file).exists():
         print("❌ Data file not found. Run 'python scraper.py' first!")

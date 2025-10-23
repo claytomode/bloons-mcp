@@ -7,9 +7,7 @@ import sys
 import json
 from pathlib import Path
 
-# Add the current directory to Python path to import our server
-sys.path.insert(0, "/home/runner/work/bloons-mcp/bloons-mcp")
-
+# Import our server modules
 try:
     from tower_stats_server import TowerDataStore, Tower, Hero
     
@@ -18,8 +16,8 @@ try:
         print("Testing TowerDataStore...")
         
         # Initialize with data file
-        data_file = "/home/runner/work/bloons-mcp/bloons-mcp/btd6_data.json"
-        store = TowerDataStore(data_file)
+        data_file = Path(__file__).parent / "btd6_data.json"
+        store = TowerDataStore(str(data_file))
         
         print(f"Loaded {len(store.towers)} towers and {len(store.heroes)} heroes")
         
@@ -60,7 +58,8 @@ try:
         print("\nTesting Pydantic models...")
         
         # Test that we can create models from the data
-        with open("/home/runner/work/bloons-mcp/bloons-mcp/btd6_data.json", 'r') as f:
+        data_file = Path(__file__).parent / "btd6_data.json"
+        with open(data_file, 'r') as f:
             data = json.load(f)
         
         tower_data = data["towers"][0]  # Get first tower

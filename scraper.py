@@ -421,8 +421,8 @@ def main():
     print(f"Generated {len(data['towers'])} towers and {len(data['heroes'])} heroes")
     
     # Save the data
-    output_path = "/home/runner/work/bloons-mcp/bloons-mcp/btd6_data.json"
-    generator.save_scraped_data(data, output_path)
+    output_path = Path(__file__).parent / "btd6_data.json"
+    generator.save_scraped_data(data, str(output_path))
     
     print("Data generation completed successfully!")
 
