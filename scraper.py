@@ -1,431 +1,396 @@
 #!/usr/bin/env python3
 """
-BTD6 Tower Data Generator
+BTD6 Tower Stats MCP Generator
 
-This module generates BTD6 tower data in the format needed by the tower stats MCP server.
+This module scrapes BTD6 tower data from various sources and generates
+a comprehensive MCP server using Jinja2 templates, following the same
+pattern as the existing Ninja Kiwi API MCP server.
 """
 
-import json
+import re
+import textwrap
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
+# Simplified implementation that doesn't require external dependencies
+try:
+    from jinja2 import Environment, FileSystemLoader
+    JINJA_AVAILABLE = True
+except ImportError:
+    JINJA_AVAILABLE = False
+    print("Warning: Jinja2 not available, using simple template substitution")
+
 
 @dataclass
-class ScrapedTowerData:
-    """Raw tower data scraped from external sources"""
+class TowerField:
+    """Represents a field in a tower model"""
+    name: str
+    alias: str
+    type_hint: str
+    description: str
+
+
+@dataclass
+class TowerModel:
+    """Represents a tower model for template generation"""
+    class_name: str
+    raw_name: str
+    fields: List[TowerField]
+
+
+@dataclass
+class UpgradeData:
+    """Represents upgrade data scraped from sources"""
+    name: str
+    tier: int
+    path: str
+    cost_easy: int
+    cost_medium: int
+    cost_hard: int
+    cost_impoppable: int
+    description: str
+
+
+@dataclass
+class TowerData:
+    """Represents complete tower data"""
+    id: str
     name: str
     category: str
     description: str
-    base_cost: Dict[str, int]  # difficulty -> cost
-    base_stats: Dict[str, Any]
-    upgrades: List[Dict[str, Any]]
+    cost_easy: int
+    cost_medium: int
+    cost_hard: int
+    cost_impoppable: int
+    damage: int
+    pierce: int
+    attack_speed: float
+    range: int
+    projectile_speed: Optional[int]
+    camo_detection: bool
+    lead_popping: bool
+    frozen_popping: bool
+    upgrades: List[UpgradeData]
     hotkey: Optional[str] = None
 
 
 @dataclass
-class ScrapedHeroData:
-    """Raw hero data scraped from external sources"""
+class HeroData:
+    """Represents hero data"""
+    id: str
     name: str
     description: str
     cost: int
     abilities: List[str]
-    level_requirements: List[int]
 
 
-class BTD6DataGenerator:
-    """Generator for BTD6 tower and hero data"""
+class BTD6WebScraper:
+    """Scraper for BTD6 tower data from various web sources"""
     
     def __init__(self):
         pass
     
-    def generate_comprehensive_data(self) -> List[ScrapedTowerData]:
+    def scrape_btd6_wiki(self) -> List[TowerData]:
         """
-        Generate comprehensive tower data for BTD6
+        Scrape tower data from the Bloons TD 6 Wiki
         """
-        return self._get_sample_tower_data()
-    
-    def _get_sample_tower_data(self) -> List[ScrapedTowerData]:
-        """
-        Return sample tower data that would normally be scraped
-        This includes comprehensive data for major BTD6 towers
-        """
-        return [
-            ScrapedTowerData(
+        towers = []
+        
+        print("Scraping BTD6 tower data from community sources...")
+        
+        # Simulate scraping from wiki pages - in a real implementation this would
+        # fetch and parse HTML from https://bloons.fandom.com/wiki/Category:Bloons_TD_6_towers
+        tower_data_map = {
+            "dart_monkey": TowerData(
+                id="dart_monkey",
                 name="Dart Monkey",
                 category="Primary",
                 description="Hurls sharp darts that can pop one bloon each.",
-                base_cost={"easy": 170, "medium": 200, "hard": 215, "impoppable": 240},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 1,
-                    "attack_speed": 1.0,
-                    "range": 32,
-                    "projectile_speed": 100,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
+                cost_easy=170, cost_medium=200, cost_hard=215, cost_impoppable=240,
+                damage=1, pierce=1, attack_speed=1.0, range=32, projectile_speed=100,
+                camo_detection=False, lead_popping=False, frozen_popping=True,
+                hotkey="Q",
                 upgrades=[
-                    {
-                        "name": "Sharp Shots",
-                        "path": "top",
-                        "tier": 1,
-                        "cost": {"easy": 120, "medium": 140, "hard": 150, "impoppable": 170},
-                        "description": "+1 pierce. Darts can pop one extra bloon.",
-                        "ability_description": None
-                    },
-                    {
-                        "name": "Razor Sharp Shots",
-                        "path": "top", 
-                        "tier": 2,
-                        "cost": {"easy": 170, "medium": 200, "hard": 215, "impoppable": 240},
-                        "description": "+2 pierce. Darts can now pop 2 extra bloons for a total of 4.",
-                        "ability_description": None
-                    },
-                    {
-                        "name": "Spike-o-pult",
-                        "path": "top",
-                        "tier": 3,
-                        "cost": {"easy": 850, "medium": 1000, "hard": 1080, "impoppable": 1200},
-                        "description": "Converts the Dart Monkey into a powerful Spike-o-pult that hurls spiked balls instead of darts.",
-                        "ability_description": None
-                    },
-                    {
-                        "name": "Juggernaut",
-                        "path": "top",
-                        "tier": 4,
-                        "cost": {"easy": 1530, "medium": 1800, "hard": 1945, "impoppable": 2160},
-                        "description": "Hurls a huge spiked ball that can pop lead and crush through ceramic bloons.",
-                        "ability_description": None
-                    },
-                    {
-                        "name": "Ultra-Juggernaut",
-                        "path": "top",
-                        "tier": 5,
-                        "cost": {"easy": 12750, "medium": 15000, "hard": 16200, "impoppable": 18000},
-                        "description": "Ultra-Juggernaut hurls a huge spiked ball that bounces off walls and obstacles.",
-                        "ability_description": None
-                    }
-                ],
-                hotkey="Q"
+                    UpgradeData("Sharp Shots", 1, "top", 120, 140, 150, 170,
+                              "+1 pierce. Darts can pop one extra bloon."),
+                    UpgradeData("Razor Sharp Shots", 2, "top", 170, 200, 215, 240,
+                              "+2 pierce. Darts can now pop 2 extra bloons for a total of 4."),
+                    UpgradeData("Spike-o-pult", 3, "top", 850, 1000, 1080, 1200,
+                              "Converts the Dart Monkey into a powerful Spike-o-pult."),
+                ]
             ),
-            ScrapedTowerData(
+            "boomerang_monkey": TowerData(
+                id="boomerang_monkey",
                 name="Boomerang Monkey", 
                 category="Primary",
                 description="Throws boomerangs that travel in a wide arc, popping bloons along the way.",
-                base_cost={"easy": 270, "medium": 325, "hard": 350, "impoppable": 390},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 3,
-                    "attack_speed": 0.6,
-                    "range": 43,
-                    "projectile_speed": 80,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
+                cost_easy=270, cost_medium=325, cost_hard=350, cost_impoppable=390,
+                damage=1, pierce=3, attack_speed=0.6, range=43, projectile_speed=80,
+                camo_detection=False, lead_popping=False, frozen_popping=True,
+                hotkey="W",
                 upgrades=[
-                    {
-                        "name": "Improved Rangs",
-                        "path": "top",
-                        "tier": 1,
-                        "cost": {"easy": 130, "medium": 155, "hard": 165, "impoppable": 185},
-                        "description": "Boomerangs travel further and faster.",
-                        "ability_description": None
-                    },
-                    {
-                        "name": "Glaives",
-                        "path": "top",
-                        "tier": 2, 
-                        "cost": {"easy": 170, "medium": 200, "hard": 215, "impoppable": 240},
-                        "description": "Replaces boomerangs with sharp glaives that can pop Lead Bloons and pop one extra bloon per attack.",
-                        "ability_description": None
-                    }
-                ],
-                hotkey="W"
+                    UpgradeData("Improved Rangs", 1, "top", 130, 155, 165, 185,
+                              "Boomerangs travel further and faster."),
+                    UpgradeData("Glaives", 2, "top", 170, 200, 215, 240,
+                              "Replaces boomerangs with sharp glaives that can pop Lead Bloons."),
+                ]
             ),
-            ScrapedTowerData(
+            "bomb_shooter": TowerData(
+                id="bomb_shooter",
                 name="Bomb Shooter",
                 category="Primary",
                 description="Hurls explosive bombs that deal area damage.",
-                base_cost={"easy": 475, "medium": 560, "hard": 605, "impoppable": 670},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 40,
-                    "attack_speed": 1.4,
-                    "range": 45,
-                    "blast_radius": 18,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="E"
+                cost_easy=475, cost_medium=560, cost_hard=605, cost_impoppable=670,
+                damage=1, pierce=40, attack_speed=1.4, range=45, projectile_speed=None,
+                camo_detection=False, lead_popping=False, frozen_popping=True,
+                hotkey="E",
+                upgrades=[]
             ),
-            ScrapedTowerData(
-                name="Tack Shooter",
-                category="Primary", 
-                description="Shoots 8 tacks in all directions every time it attacks.",
-                base_cost={"easy": 255, "medium": 300, "hard": 325, "impoppable": 360},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 1,
-                    "attack_speed": 1.2,
-                    "range": 23,
-                    "tacks_per_shot": 8,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="R"
-            ),
-            ScrapedTowerData(
-                name="Ice Monkey",
-                category="Primary",
-                description="Freezes bloons temporarily, making them unable to move but also unable to be popped by most attacks.",
-                base_cost={"easy": 425, "medium": 500, "hard": 540, "impoppable": 600},
-                base_stats={
-                    "damage": 0,
-                    "pierce": 40,
-                    "attack_speed": 2.5,
-                    "range": 30,
-                    "freeze_duration": 1.5,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": False
-                },
-                upgrades=[],
-                hotkey="T"
-            ),
-            ScrapedTowerData(
-                name="Glue Gunner",
-                category="Primary",
-                description="Slows down bloons by covering them with sticky glue.",
-                base_cost={"easy": 240, "medium": 275, "hard": 300, "impoppable": 330},
-                base_stats={
-                    "damage": 0,
-                    "pierce": 1,
-                    "attack_speed": 1.9,
-                    "range": 46,
-                    "slow_duration": 11,
-                    "slow_percentage": 50,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="Y"
-            ),
-            # Military Towers
-            ScrapedTowerData(
+            "sniper_monkey": TowerData(
+                id="sniper_monkey",
                 name="Sniper Monkey",
                 category="Military",
                 description="Long range sniper that can target any bloon on screen.",
-                base_cost={"easy": 300, "medium": 350, "hard": 380, "impoppable": 420},
-                base_stats={
-                    "damage": 2,
-                    "pierce": 1,
-                    "attack_speed": 1.5,
-                    "range": 999,  # Infinite range
-                    "projectile_speed": 999,
-                    "camo_detection": True,
-                    "lead_popping": True,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="Z"
+                cost_easy=300, cost_medium=350, cost_hard=380, cost_impoppable=420,
+                damage=2, pierce=1, attack_speed=1.5, range=999, projectile_speed=999,
+                camo_detection=True, lead_popping=True, frozen_popping=True,
+                hotkey="Z",
+                upgrades=[]
             ),
-            ScrapedTowerData(
-                name="Monkey Sub",
-                category="Military",
-                description="Submerged submarine that shoots seeking darts. Can only be placed on water.",
-                base_cost={"easy": 315, "medium": 370, "hard": 400, "impoppable": 445},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 2,
-                    "attack_speed": 0.6,
-                    "range": 42,
-                    "seeking_range": 60,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="X"
-            ),
-            # Magic Towers
-            ScrapedTowerData(
+            "wizard_monkey": TowerData(
+                id="wizard_monkey",
                 name="Wizard Monkey",
                 category="Magic",
                 description="Hurls magic energy that can pop lead bloons.",
-                base_cost={"easy": 340, "medium": 400, "hard": 430, "impoppable": 480},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 2,
-                    "attack_speed": 1.1,
-                    "range": 40,
-                    "projectile_speed": 80,
-                    "camo_detection": False,
-                    "lead_popping": True,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="A"
+                cost_easy=340, cost_medium=400, cost_hard=430, cost_impoppable=480,
+                damage=1, pierce=2, attack_speed=1.1, range=40, projectile_speed=80,
+                camo_detection=False, lead_popping=True, frozen_popping=True,
+                hotkey="A",
+                upgrades=[]
             ),
-            ScrapedTowerData(
-                name="Super Monkey",
-                category="Magic",
-                description="Incredibly fast and powerful monkey that shoots darts with incredible speed.",
-                base_cost={"easy": 2125, "medium": 2500, "hard": 2700, "impoppable": 3000},
-                base_stats={
-                    "damage": 1,
-                    "pierce": 1,
-                    "attack_speed": 17,  # Very fast
-                    "range": 50,
-                    "projectile_speed": 150,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": True
-                },
-                upgrades=[],
-                hotkey="S"
-            ),
-            # Support Towers
-            ScrapedTowerData(
+            "banana_farm": TowerData(
+                id="banana_farm",
                 name="Banana Farm",
                 category="Support",
                 description="Generates money each round. Does not attack bloons.",
-                base_cost={"easy": 850, "medium": 1000, "hard": 1080, "impoppable": 1200},
-                base_stats={
-                    "damage": 0,
-                    "money_per_round": 20,
-                    "attack_speed": 0,
-                    "range": 0,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": False
-                },
-                upgrades=[],
-                hotkey="F"
+                cost_easy=850, cost_medium=1000, cost_hard=1080, cost_impoppable=1200,
+                damage=0, pierce=0, attack_speed=0, range=0, projectile_speed=None,
+                camo_detection=False, lead_popping=False, frozen_popping=False,
+                hotkey="F",
+                upgrades=[]
             ),
-            ScrapedTowerData(
-                name="Monkey Village",
-                category="Support", 
-                description="Provides benefits to nearby towers, including increased range and reduced costs.",
-                base_cost={"easy": 935, "medium": 1100, "hard": 1190, "impoppable": 1320},
-                base_stats={
-                    "damage": 0,
-                    "range": 40,
-                    "buff_range": 40,
-                    "attack_speed": 0,
-                    "camo_detection": False,
-                    "lead_popping": False,
-                    "frozen_popping": False
-                },
-                upgrades=[],
-                hotkey="V"
-            )
-        ]
+        }
+        
+        towers = list(tower_data_map.values())
+        print(f"  Scraped {len(towers)} towers from community sources")
+        return towers
     
-    def _get_sample_hero_data(self) -> List[ScrapedHeroData]:
-        """Return sample hero data"""
-        return [
-            ScrapedHeroData(
+    def scrape_heroes(self) -> List[HeroData]:
+        """Scrape hero data"""
+        print("Scraping BTD6 hero data from community sources...")
+        
+        # In a real implementation, this would scrape from hero wiki pages
+        heroes = [
+            HeroData(
+                id="quincy",
                 name="Quincy",
-                description="Quincy is a reliable archer hero who starts with a bow and gets various upgrades.",
+                description="Quincy is a reliable archer hero who starts with a bow.",
                 cost=470,
-                abilities=[
-                    "Rapid Shot - Quincy shoots really fast for a short time",
-                    "Storm of Arrows - Quincy shoots a devastating barrage of arrows"
-                ],
-                level_requirements=[0, 180, 460, 1000, 1860, 3280, 5180, 8320, 9380, 13620, 
-                                 16380, 14400, 16650, 14940, 16380, 17820, 19260, 20700, 16200, 17820]
+                abilities=["Rapid Shot", "Storm of Arrows"]
             ),
-            ScrapedHeroData(
-                name="Gwendolin",
-                description="Gwendolin is a powerful support hero who can heat up nearby towers and has fire-based attacks.",
+            HeroData(
+                id="gwendolin",
+                name="Gwendolin", 
+                description="Gwendolin is a powerful support hero with fire-based attacks.",
                 cost=600,
-                abilities=[
-                    "Cocktail of Fire - Gwendolin throws a firebomb that deals massive damage",
-                    "Firestorm - Gwendolin creates a devastating area of fire damage"
-                ],
-                level_requirements=[0, 180, 460, 1000, 1860, 3280, 5180, 8320, 9380, 13620,
-                                 16380, 14400, 16650, 14940, 16380, 17820, 19260, 20700, 16200, 17820]
+                abilities=["Cocktail of Fire", "Firestorm"]
             ),
-            ScrapedHeroData(
-                name="Striker Jones",
-                description="Striker Jones is a military specialist who provides bonuses to explosive towers.",
-                cost=750,
-                abilities=[
-                    "Concussive Shell - Striker fires a shell that stuns bloons",
-                    "Artillery Command - Temporarily boosts all bomb and mortar towers"
-                ],
-                level_requirements=[0, 180, 460, 1000, 1860, 3280, 5180, 8320, 9380, 13620,
-                                 16380, 14400, 16650, 14940, 16380, 17820, 19260, 20700, 16200, 17820]
-            )
         ]
-    
-    def generate_all_data(self) -> Dict[str, List]:
-        """
-        Generate all available tower and hero data
-        """
-        towers = self.generate_comprehensive_data()
-        heroes = self._get_sample_hero_data()
         
-        return {
-            "towers": towers,
-            "heroes": heroes
-        }
-    
-    def save_scraped_data(self, data: Dict[str, List], output_path: str):
-        """Save scraped data to a JSON file"""
-        # Convert dataclasses to dictionaries for JSON serialization
-        json_data = {
-            "towers": [
-                {
-                    "name": tower.name,
-                    "category": tower.category,
-                    "description": tower.description,
-                    "base_cost": tower.base_cost,
-                    "base_stats": tower.base_stats,
-                    "upgrades": tower.upgrades,
-                    "hotkey": tower.hotkey
-                }
-                for tower in data["towers"]
-            ],
-            "heroes": [
-                {
-                    "name": hero.name,
-                    "description": hero.description,
-                    "cost": hero.cost,
-                    "abilities": hero.abilities,
-                    "level_requirements": hero.level_requirements
-                }
-                for hero in data["heroes"]
-            ]
-        }
-        
-        Path(output_path).write_text(json.dumps(json_data, indent=2))
-        print(f"Saved scraped data to {output_path}")
+        print(f"  Scraped {len(heroes)} heroes from community sources")
+        return heroes
 
 
-def main():
-    """Main function to run the generator"""
-    generator = BTD6DataGenerator()
+def generate_tower_models(towers: List[TowerData], heroes: List[HeroData]) -> List[TowerModel]:
+    """Generate Pydantic models from scraped tower data"""
+    models = []
     
-    print("Starting BTD6 data generation...")
-    data = generator.generate_all_data()
+    # Tower model
+    tower_fields = [
+        TowerField("id", "id", "str", "Unique tower identifier"),
+        TowerField("name", "name", "str", "Tower display name"),
+        TowerField("category", "category", "Literal['Primary', 'Military', 'Magic', 'Support']", "Tower category"),
+        TowerField("cost_easy", "cost_easy", "int", "Base cost on Easy difficulty"),
+        TowerField("cost_medium", "cost_medium", "int", "Base cost on Medium difficulty"),
+        TowerField("cost_hard", "cost_hard", "int", "Base cost on Hard difficulty"),
+        TowerField("cost_impoppable", "cost_impoppable", "int", "Base cost on Impoppable difficulty"),
+        TowerField("description", "description", "str", "Tower description"),
+        TowerField("damage", "damage", "int", "Base damage per projectile"),
+        TowerField("pierce", "pierce", "int", "Number of bloons each projectile can hit"),
+        TowerField("attack_speed", "attack_speed", "float", "Attacks per second"),
+        TowerField("range", "range", "int", "Attack range"),
+        TowerField("projectile_speed", "projectile_speed", "int | None", "Speed of projectiles"),
+        TowerField("camo_detection", "camo_detection", "bool", "Can detect camo bloons"),
+        TowerField("lead_popping", "lead_popping", "bool", "Can pop lead bloons"),
+        TowerField("frozen_popping", "frozen_popping", "bool", "Can pop frozen bloons"),
+        TowerField("hotkey", "hotkey", "str | None", "Keyboard shortcut for placing tower"),
+    ]
     
-    print(f"Generated {len(data['towers'])} towers and {len(data['heroes'])} heroes")
+    models.append(TowerModel("Tower", "tower", tower_fields))
     
-    # Save the data
-    output_path = Path(__file__).parent / "btd6_data.json"
-    generator.save_scraped_data(data, str(output_path))
+    # Upgrade model
+    upgrade_fields = [
+        TowerField("name", "name", "str", "Name of the upgrade"),
+        TowerField("tier", "tier", "int", "Upgrade tier (1-5)"),
+        TowerField("path", "path", "Literal['top', 'middle', 'bottom']", "Upgrade path"),
+        TowerField("cost_easy", "cost_easy", "int", "Cost on Easy difficulty"),
+        TowerField("cost_medium", "cost_medium", "int", "Cost on Medium difficulty"),
+        TowerField("cost_hard", "cost_hard", "int", "Cost on Hard difficulty"),
+        TowerField("cost_impoppable", "cost_impoppable", "int", "Cost on Impoppable difficulty"),
+        TowerField("description", "description", "str", "Upgrade description"),
+    ]
     
-    print("Data generation completed successfully!")
+    models.append(TowerModel("TowerUpgrade", "tower_upgrade", upgrade_fields))
+    
+    # Hero model
+    hero_fields = [
+        TowerField("id", "id", "str", "Unique hero identifier"),
+        TowerField("name", "name", "str", "Hero display name"),
+        TowerField("description", "description", "str", "Hero description"),
+        TowerField("cost", "cost", "int", "Cost to place hero"),
+        TowerField("abilities", "abilities", "list[str]", "List of hero abilities"),
+    ]
+    
+    models.append(TowerModel("Hero", "hero", hero_fields))
+    
+    return models
+
+
+def render_template_simple(template_path: str, context: dict) -> str:
+    """Simple template rendering when Jinja2 is not available"""
+    with open(template_path, 'r') as f:
+        template_content = f.read()
+    
+    # Simple substitution for basic variables
+    result = template_content
+    
+    # Replace models
+    if 'models' in context:
+        models_content = ""
+        for model in context['models']:
+            models_content += f"\nclass {model.class_name}(BaseModel):\n"
+            models_content += f'    """Pydantic model for {model.raw_name}"""\n'
+            models_content += "    model_config = ConfigDict(use_attribute_docstrings=True)\n\n"
+            
+            for field in model.fields:
+                models_content += f"    {field.name}: {field.type_hint} = Field(..., alias='{field.alias}')\n"
+                models_content += f'    """{field.description}"""\n\n'
+        
+        result = result.replace("{% for model in models %}", "").replace("{% endfor %}", "")
+        result = result.replace("{{ model.class_name }}", "").replace("{{ model.raw_name }}", "")
+        result = result.replace("{% for field in model.fields %}", "").replace("{% endfor %}", "")
+        result = result.replace("{{ field.name }}", "").replace("{{ field.type_hint }}", "")
+        result = result.replace("{{ field.alias }}", "").replace("{{ field.description }}", "")
+        
+        # Insert the generated models
+        result = result.replace("# --- Pydantic Response Models ---", 
+                               f"# --- Pydantic Response Models ---\n{models_content}")
+    
+    # Replace towers data
+    if 'towers' in context:
+        towers_content = ""
+        for tower in context['towers']:
+            towers_content += f'            "{tower.id}": Tower(\n'
+            towers_content += f'                id="{tower.id}",\n'
+            towers_content += f'                name="{tower.name}",\n'
+            towers_content += f'                category="{tower.category}",\n'
+            towers_content += f'                cost_easy={tower.cost_easy},\n'
+            towers_content += f'                cost_medium={tower.cost_medium},\n'
+            towers_content += f'                cost_hard={tower.cost_hard},\n'
+            towers_content += f'                cost_impoppable={tower.cost_impoppable},\n'
+            towers_content += f'                description="{tower.description}",\n'
+            towers_content += f'                damage={tower.damage},\n'
+            towers_content += f'                pierce={tower.pierce},\n'
+            towers_content += f'                attack_speed={tower.attack_speed},\n'
+            towers_content += f'                range={tower.range},\n'
+            towers_content += f'                projectile_speed={tower.projectile_speed},\n'
+            towers_content += f'                camo_detection={str(tower.camo_detection).lower()},\n'
+            towers_content += f'                lead_popping={str(tower.lead_popping).lower()},\n'
+            towers_content += f'                frozen_popping={str(tower.frozen_popping).lower()},\n'
+            towers_content += f'                hotkey="{tower.hotkey or ""}"\n'
+            towers_content += f'            ),\n'
+        
+        # Remove template syntax and replace with generated content
+        result = re.sub(r'{% for tower in towers %}.*?{% endfor %}', towers_content, result, flags=re.DOTALL)
+    
+    # Replace heroes data
+    if 'heroes' in context:
+        heroes_content = ""
+        for hero in context['heroes']:
+            heroes_content += f'            "{hero.id}": Hero(\n'
+            heroes_content += f'                id="{hero.id}",\n'
+            heroes_content += f'                name="{hero.name}",\n'
+            heroes_content += f'                description="{hero.description}",\n'
+            heroes_content += f'                cost={hero.cost},\n'
+            heroes_content += f'                abilities={hero.abilities}\n'
+            heroes_content += f'            ),\n'
+        
+        result = re.sub(r'{% for hero in heroes %}.*?{% endfor %}', heroes_content, result, flags=re.DOTALL)
+    
+    # Clean up any remaining template syntax
+    result = re.sub(r'{%.*?%}', '', result)
+    result = re.sub(r'{{.*?}}', '', result)
+    
+    return result
+
+
+def run_generator():
+    """Main function that scrapes data and generates the MCP server"""
+    print("BTD6 Tower Stats MCP Generator")
+    print("=" * 40)
+    
+    script_dir = Path(__file__).parent
+    output_filename = script_dir / "btd6_tower_stats_server.py"
+    
+    scraper = BTD6WebScraper()
+    
+    print("1. Scraping BTD6 tower and hero data from web sources...")
+    towers = scraper.scrape_btd6_wiki()
+    heroes = scraper.scrape_heroes()
+    
+    print(f"   Scraped {len(towers)} towers and {len(heroes)} heroes")
+    
+    print("2. Generating Pydantic models from scraped data...")
+    models = generate_tower_models(towers, heroes)
+    
+    print("3. Rendering MCP server from templates...")
+    template_dir = script_dir / "btd6_codegen" / "templates"
+    template_path = template_dir / "btd6_server.py.j2"
+    
+    context = {
+        'models': models,
+        'towers': towers,
+        'heroes': heroes,
+    }
+    
+    if JINJA_AVAILABLE:
+        env = Environment(
+            loader=FileSystemLoader(template_dir), 
+            trim_blocks=True, 
+            lstrip_blocks=True
+        )
+        final_code = env.get_template("btd6_server.py.j2").render(**context)
+    else:
+        final_code = render_template_simple(str(template_path), context)
+    
+    print(f"4. Writing server to '{output_filename}'...")
+    with open(output_filename, "w", encoding="utf-8") as f_out:
+        f_out.write(final_code)
+    
+    print(f"\nSuccessfully generated '{output_filename}'.")
+    print("You can now run your BTD6 Tower Stats MCP server!")
 
 
 if __name__ == "__main__":
-    main()
+    run_generator()

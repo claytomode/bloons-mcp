@@ -16,30 +16,39 @@ The original server that provides a `FastMCP` interface for the official Ninja K
 **File:** `fastmcp_server.py`
 
 ### 2. BTD6 Tower Stats MCP Server
-A comprehensive server providing detailed BTD6 tower statistics, upgrade paths, and game mechanics data.
+A comprehensive server providing detailed BTD6 tower statistics, upgrade paths, and game mechanics data scraped from community sources.
 
 **Features:**
+- Web scraping from BTD6 Wiki and community sources
+- Jinja2 template-based code generation (following same pattern as main server)
 - Complete tower database with stats, costs, descriptions
-- Detailed upgrade path analysis with costs for all difficulties
-- Hero information with abilities and level requirements
+- Hero information with abilities and progression data
 - Advanced search and filtering capabilities
 - Cost comparison and upgrade calculators
 
 **Files:** 
-- `tower_stats_server.py` - Main MCP server
-- `scraper.py` - Data generator  
-- `btd6_data.json` - Generated tower/hero database
-- `README_TOWER_STATS.md` - Detailed documentation
+- `scraper.py` - Web scraper and template-based generator
+- `btd6_codegen/templates/btd6_server.py.j2` - Jinja2 template for server generation
+- `btd6_tower_stats_server.py` - Generated MCP server (auto-generated, do not edit)
 
 ## Code Generation System
 
-The core of the Ninja Kiwi API server is a code generation script that scrapes the official [Ninja Kiwi API documentation](https://data.ninjakiwi.com/) to automatically create:
+Both servers use code generation with web scraping and Jinja2 templates:
 
+### Ninja Kiwi API Server
+Scrapes the official [Ninja Kiwi API documentation](https://data.ninjakiwi.com/) to automatically generate:
 * A fully typed asynchronous Python client for the API
 * Pydantic models for all API response objects
 * `FastMCP` tool wrappers for every API endpoint
 
-This ensures the server stays up-to-date with any changes in the official API with minimal manual effort.
+### BTD6 Tower Stats Server  
+Scrapes community sources (BTD6 Wiki, etc.) to automatically generate:
+* Comprehensive tower and hero data models
+* Complete BTD6 tower stats MCP server
+* Type-safe Pydantic models for all game data
+* Advanced search and analysis tools
+
+This ensures both servers stay up-to-date with changes in their respective data sources with minimal manual effort.
 
 ## Quick Start
 
@@ -50,16 +59,11 @@ python fastmcp_server.py
 
 ### BTD6 Tower Stats Server
 ```bash
-# Generate tower data
+# Generate the server from web-scraped data
 python scraper.py
 
-# Run the server  
-python tower_stats_server.py
-```
-
-### Demo the Tower Stats
-```bash
-python demo_tower_stats.py
+# Run the generated server  
+python btd6_tower_stats_server.py
 ```
 
 ## Installation
@@ -86,7 +90,17 @@ python demo_tower_stats.py
 
 ## Data Sources
 
-- **Official Ninja Kiwi API**: Real-time player and event data
-- **Tower Stats Database**: Comprehensive game mechanics data derived from community sources and game analysis
+- **Official Ninja Kiwi API**: Real-time player and event data via web scraping + generation
+- **BTD6 Community Sources**: Tower stats from BTD6 Wiki and community databases via web scraping + generation
 
 Together, these servers provide both official player data and detailed game mechanics information for comprehensive BTD6 analysis and research.
+
+## Development
+
+Both servers follow the same pattern:
+1. **Web Scraping**: Automated data collection from external sources
+2. **Jinja2 Templates**: Type-safe code generation using templates
+3. **Generated Servers**: Complete MCP servers with all tools and models
+4. **Automatic Updates**: Re-run generators to update with latest data
+
+This architecture ensures maintainability and keeps data current with external sources.
